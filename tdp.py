@@ -51,9 +51,15 @@ def undo(task):
         return task
 
 def schedule(task, date):
+
+    future_num = re.search('3\d{7}\s', task)
+    if future_num:
+        task = unset_future(task)
+
     if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
         print("This task is already scheduled")
         return
+
 
     # catch various date formats, set them up for processing
     if re.match('\d{1,2}$', date):
@@ -417,6 +423,50 @@ def expand(task):
     else:
         return task
 
+def unset_future(task):
+    future_num = re.search('3\d{7}\s', task)
+    if future_num:
+        start = future_num.start()
+        end = future_num.end()
+        return task[:start] + task[end:]
+    else:
+        return task
+
+def set_future(task, order=35000000):
+    future_num = re.search('3\d{7}\s', task)
+    if future_num:
+        task = unset_future(task)
+    if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
+        task = unschedule(task)
+    if task.startswith('('): # insert behind priority if one is set
+        return '%s%s %s' % (task[:4], order, task[4:])
+    else:
+        return '%s %s' % (order, task)
+
+def set_after(task, linenum):
+    pivot_task = file[linenum]
+    pivot_order = re.search('3\d{7}\s', pivot_task)
+    if pivot_order:
+        pivot_order = int(pivot_order.group())
+    else:
+        print('pivot task not scheduled in fuzzy future')
+        return task
+    if not linenum + 1 < len(file):
+        adjacent_task = file[linenum+1]
+        adjacent_order = re.search('3\d{7}\s', pivot_task)
+        if adjacent_order:
+            adjacent_order = int(adjacent_order.group())
+        else: adjacent_order = 39999999
+    else:
+        adjacent_order = 39999999
+
+    half_diff = (adjacent_order - pivot_order) // 2
+    order = pivot_order + half_diff
+
+    return set_future(task, order)
+
+def set_before():
+    pass
 
 def main(argv):
     # argument-less functionality
@@ -500,12 +550,18 @@ def main(argv):
             file[linenum] = contract(task)
         elif argv[1] == "ex":
             file[linenum] = expand(task)
+        elif argv[1] == "unfut":
+            file[linenum] = unset_future(task)
+        elif argv[1] == "sf":
+            file[linenum] = set_future(task)
+        elif argv[1] == "sa":
+            file[linenum] = set_after(task, int(argv[2]))
     else:
         return
 
     # write changes to file
     if file:
-    #    reorder()
+        reorder()
         with open("todo.txt", "w") as f:
             for line in file:
                 f.write(line)

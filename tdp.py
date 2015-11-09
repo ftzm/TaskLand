@@ -504,8 +504,26 @@ def future_order_after(moved_index, pivot_index):
     if adjacent_num - pivot_num < 4 or num > 9999999:
         future_redistribute()
 
-def set_before():
-    pass
+def future_order_before(moved_index, pivot_index):
+    # get num of target (pivot) task
+    pivot_num = future_get_num(file[pivot_index])
+    if not pivot_num:
+        print('pivot task not scheduled in fuzzy future')
+        return
+    adjacent_num = 0
+    if pivot_index != 1:
+        adjacent_num = future_get_num(file[pivot_index-1])
+        if not adjacent_num:
+            adjacent_num = 0
+    half_diff = (pivot_num - adjacent_num) // 2
+    num = pivot_num - half_diff
+
+    file[moved_index] = future_assign_num(file[moved_index], num)
+
+    # redistribute if the gap between tasks becomes too small
+    # in the rare event the num reaches > 9999999, redist
+    if pivot_num - adjacent_num < 4:
+        future_redistribute()
 
 def main(argv):
     # argument-less functionality
@@ -595,6 +613,8 @@ def main(argv):
             file[linenum] = future_set(task)
         elif argv[1] == "sa":
             future_order_after(int(argv[0]), int(argv[2]))
+        elif argv[1] == "sb":
+            future_order_before(int(argv[0]), int(argv[2]))
         elif argv[1] == "fr":
             future_redistribute()
     else:

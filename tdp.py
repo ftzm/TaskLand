@@ -11,6 +11,7 @@ with open("todo.txt", "r") as f:
 weekdays = ['u', 'm', 't', 'w', 'r', 'f', 's']
 today = datetime.date.today().strftime("%Y %m %d %w")
 today = [int(i) for i in list(filter(None, today.split(' ')))]
+today_string = '{}-{:0=2d}-{:0=2d}'.format(today[0], today[1], today[2])
 month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 if today[0] % 4 == 0:
     month_lengths[1] = 29
@@ -50,16 +51,25 @@ def undo(task):
         print('This task was never completed')
         return task
 
+def unschedule(task):
+    dates = re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task)
+    if dates:
+        return task[:dates.start()] + task[dates.start()+11:]
+    else:
+        return task
+
+def assign_duedate(task, due):
+    task = unschedule(task) #returns unchanged if not scheduled
+    if task.startswith('('): # insert behind priority if one is set
+        return '%s%s %s' % (task[:4], due, task[4:])
+    else:
+        return '%s %s' % (due, task)
+
 def schedule(task, date):
 
     future_num = re.search('3\d{7}\s', task)
     if future_num:
         task = unset_future(task)
-
-    if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
-        print("This task is already scheduled")
-        return
-
 
     # catch various date formats, set them up for processing
     if re.match('\d{1,2}$', date):
@@ -106,17 +116,8 @@ def schedule(task, date):
 
     due = '{}-{:0=2d}-{:0=2d}'.format(year, month, day)
 
-    if task.startswith('('): # insert behind priority if one is set
-        return '%s%s %s' % (task[:4], due, task[4:])
-    else:
-        return '%s %s' % (due, task)
+    return assign_duedate(task, due)
 
-def unschedule(task):
-    dates = re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task)
-    if dates:
-        return task[:dates.start()] + task[dates.start()+11:]
-    else:
-        print("Task isn't scheduled")
 
 def postpone():
     pass
@@ -146,7 +147,7 @@ def set_context(task, context):
     if '@' + context in task:
         print("That context is already assigned")
         return task
-    insert_before = re.search('S:|O:', task)
+    insert_before = re.search('P:|C:|R:', task)
     if insert_before:
         return '{}@{} {}'.format(task[:insert_before.start()], \
                 context, task[insert_before.start():])
@@ -176,7 +177,7 @@ def set_project(task, project):
     if '+' + project in task:
         print("That project is already assigned")
         return task
-    insert_before = re.search('@\w+|S:|O:', task)
+    insert_before = re.search('@\w+|P:|C:|R:', task)
     if insert_before:
         return '{}+{} {}'.format(task[:insert_before.start()], \
                 project, task[insert_before.start():])
@@ -525,6 +526,61 @@ def future_order_before(moved_index, pivot_index):
     if pivot_num - adjacent_num < 4:
         future_redistribute()
 
+def recur_unset(task):
+    tag = re.search('R:\w+', task)
+    start = tag.start()
+    end = tag.end()
+    return task[:start-1] + task[end:]
+
+def recur_set(task, days):
+    # makes recur tag
+    if re.match('e\d{1,2}$|a\d{1,2}$', days):
+        tag = 'R:' + days
+    elif re.match('[mtwrfsu]{1,7}', days):
+        tag = 'R:'
+        for c in "mtwrfsu":
+            if c in days:
+                tag += c
+    else:
+        print('Not a valid recur format')
+        return task
+
+    # remove old recur tag
+    if 'R:' in task:
+        task = recur_unset(task)
+
+    insert_before = re.search('P:|C:', task)
+    if insert_before:
+        return '{}{} {}'.format(task[:insert_before.start()], \
+                tag, task[insert_before.start():])
+    else:
+        return task[:-1] + ' ' + tag + task[-1:]
+
+def add_days(date, num):
+    year, month, day = date.split('-')
+    year, month, day = int(year), int(month)-1, int(day)
+    day += num
+    while day > month_lengths[month]:
+        day -= month_lengths[month]
+        month += 1
+        if month > 11:
+            year += 1
+            month = 0
+    return '{}-{:0=2d}-{:0=2d}'.format(year, month+1, day)
+
+def recur_recycle(task):
+    days = re.match('R:\w+')[2:]
+    if 'a' in days:
+        num = days[1:]
+        due = add_days(today_string, )
+    elif 'e' in days:
+        num = days[1:]
+        created = re.search('\d{4}-\d{1,2}-\d{1,2}', task)
+    else:
+        pass
+    removed = do(task)
+    fresh_task = assign_duedate(fresh_task, due)
+
 def main(argv):
     # argument-less functionality
     if not argv:
@@ -617,6 +673,10 @@ def main(argv):
             future_order_before(int(argv[0]), int(argv[2]))
         elif argv[1] == "fr":
             future_redistribute()
+        elif argv[1] == "sr":
+            file[linenum] = recur_set(task, argv[2])
+        elif argv[1] == "usr":
+            file[linenum] = recur_unset(task)
     else:
         return
 

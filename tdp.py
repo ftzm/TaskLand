@@ -440,16 +440,16 @@ def future_find_last_num():
     return None
 
 def future_assign_num(task, num):
-    if task.startswith('('): # insert behind priority if one is set
-        return '%s3%s %s' % (task[:4], num, task[4:])
-    else:
-        return '3%s %s' % (num, task)
-
-def future_set(task):
     future_num = re.search('3\d{7}\s', task)
     if future_num:
         task = future_unset(task)
-    elif re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
+    if task.startswith('('): # insert behind priority if one is set
+        return '{}3{:0=7d} {}'.format(task[:4], num, task[4:])
+    else:
+        return '3{:0=7d} {}'.format(num, task)
+
+def future_set(task):
+    if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
         task = unschedule(task)
     last_future_num = future_find_last_num()
     if last_future_num:
@@ -457,31 +457,52 @@ def future_set(task):
         if last_future_num < 9999999:
             return future_assign_num(task, future_num)
     else:
-        return future_assign_num(task, 1000000)
+        return future_assign_num(task, 10000)
 
+def future_redistribute():
+    file.sort()
+    last_num = 0
+    for i, line in enumerate(file):
+        future_num = re.search('3\d{7}\s', line)
+        if future_num:
+            num = last_num + 10000
+            file[i] = future_assign_num(line, num)
+            last_num = num
 
-
-def future_order_after(task, linenum):
-    pivot_task = file[linenum]
-    pivot_order = re.search('3\d{7}\s', pivot_task)
-    if pivot_order:
-        pivot_order = int(pivot_order.group())
+def future_get_num(task):
+    num = re.search('3\d{7}\s', task)
+    if num:
+        return int(num.group()[1:])
     else:
+        return None
+
+def future_order_after(moved_index, pivot_index):
+    # get num of target (pivot) task
+    pivot_num = future_get_num(file[pivot_index])
+    if not pivot_num:
         print('pivot task not scheduled in fuzzy future')
-        return task
-    if not linenum + 1 < len(file):
-        adjacent_task = file[linenum+1]
-        adjacent_order = re.search('3\d{7}\s', pivot_task)
-        if adjacent_order:
-            adjacent_order = int(adjacent_order.group())
-        else: adjacent_order = 39999999
+        return
+
+    # check if there is another line after pivot task
+    if pivot_index + 1 < len(file):
+        # if there is a line, check for future num.
+        adjacent_num = future_get_num(file[pivot_index+1])
+        #if there is a future num, make num half the difference with pivot
+        if adjacent_num:
+            half_diff = (adjacent_num - pivot_num) // 2
+            num = pivot_num + half_diff
+        # if no adjacent number then the pivot task is final future task
+        else:
+            num = pivot_num + 10000
     else:
-        adjacent_order = 39999999
+        num = pivot_num + 10000
 
-    half_diff = (adjacent_order - pivot_order) // 2
-    order = pivot_order + half_diff
+    file[moved_index] = future_assign_num(file[moved_index], num)
 
-    return future_assign_num(task, order)
+    # redistribute if the gap between tasks becomes too small
+    # in the rare event the num reaches > 9999999, redist
+    if adjacent_num - pivot_num < 4 or num > 9999999:
+        future_redistribute()
 
 def set_before():
     pass
@@ -573,7 +594,9 @@ def main(argv):
         elif argv[1] == "sf":
             file[linenum] = future_set(task)
         elif argv[1] == "sa":
-            file[linenum] = set_after(task, int(argv[2]))
+            future_order_after(int(argv[0]), int(argv[2]))
+        elif argv[1] == "fr":
+            future_redistribute()
     else:
         return
 

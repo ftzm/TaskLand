@@ -423,7 +423,7 @@ def expand(task):
     else:
         return task
 
-def unset_future(task):
+def future_unset(task):
     future_num = re.search('3\d{7}\s', task)
     if future_num:
         start = future_num.start()
@@ -432,18 +432,36 @@ def unset_future(task):
     else:
         return task
 
-def set_future(task, order=35000000):
+def future_find_last_num():
+    for i in range(len(file)-1, -1, -1):
+        last_future_num = re.search('3\d{7}\s', file[i])
+        if last_future_num:
+            return int(last_future_num.group()[1:])
+    return None
+
+def future_assign_num(task, num):
+    if task.startswith('('): # insert behind priority if one is set
+        return '%s3%s %s' % (task[:4], num, task[4:])
+    else:
+        return '3%s %s' % (num, task)
+
+def future_set(task):
     future_num = re.search('3\d{7}\s', task)
     if future_num:
-        task = unset_future(task)
-    if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
+        task = future_unset(task)
+    elif re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
         task = unschedule(task)
-    if task.startswith('('): # insert behind priority if one is set
-        return '%s%s %s' % (task[:4], order, task[4:])
+    last_future_num = future_find_last_num()
+    if last_future_num:
+        future_num = last_future_num + 10000
+        if last_future_num < 9999999:
+            return future_assign_num(task, future_num)
     else:
-        return '%s %s' % (order, task)
+        return future_assign_num(task, 1000000)
 
-def set_after(task, linenum):
+
+
+def future_order_after(task, linenum):
     pivot_task = file[linenum]
     pivot_order = re.search('3\d{7}\s', pivot_task)
     if pivot_order:
@@ -463,7 +481,7 @@ def set_after(task, linenum):
     half_diff = (adjacent_order - pivot_order) // 2
     order = pivot_order + half_diff
 
-    return set_future(task, order)
+    return future_assign_num(task, order)
 
 def set_before():
     pass
@@ -551,9 +569,9 @@ def main(argv):
         elif argv[1] == "ex":
             file[linenum] = expand(task)
         elif argv[1] == "unfut":
-            file[linenum] = unset_future(task)
+            file[linenum] = future_unset(task)
         elif argv[1] == "sf":
-            file[linenum] = set_future(task)
+            file[linenum] = future_set(task)
         elif argv[1] == "sa":
             file[linenum] = set_after(task, int(argv[2]))
     else:

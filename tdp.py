@@ -13,8 +13,6 @@ today = datetime.date.today().strftime("%Y %m %d %w")
 today = [int(i) for i in list(filter(None, today.split(' ')))]
 today_string = '{}-{:0=2d}-{:0=2d}'.format(today[0], today[1], today[2])
 month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-if today[0] % 4 == 0:
-    month_lengths[1] = 29
 
 def add(words):
     created = datetime.date.today().strftime("%Y-%m-%d")
@@ -568,18 +566,63 @@ def add_days(date, num):
             month = 0
     return '{}-{:0=2d}-{:0=2d}'.format(year, month+1, day)
 
+def days_since_2000(date):
+    date = [int(n) for n in date.split('-')]
+    date_yeardays = (date[0]-2000) * 365 + (date[0]-2001) // 4
+    date_monthdays = sum([month_lengths[n] for n in range(date[1]-1)])
+    if date[1] > 2 and date[0] % 4 == 0: date_monthdays += 1
+    return date_yeardays + date_monthdays + date[2]
+
+def get_days_diff(date1, date2):
+    return days_since_2000(date1) - days_since_2000(date2)
+
+def strip_prefixes(task):
+    task = task.split(' ')
+    start = 0
+    while True:
+        if task[start].startswith('(') or re.match('3\d{7}', task[start]) \
+                or re.match('\d{4}-\d{2}-\d{2}', task[start]):
+            start += 1
+        else:
+            break
+    return ' '.join(task[start:])
+
 def recur_recycle(task):
-    days = re.match('R:\w+')[2:]
+    days = re.search('R:\w+', task).group()[2:]
     if 'a' in days:
-        num = days[1:]
-        due = add_days(today_string, )
+        offset = int(days[1:])
+        due = add_days(today_string, offset)
     elif 'e' in days:
-        num = days[1:]
-        created = re.search('\d{4}-\d{1,2}-\d{1,2}', task)
+        days = days[1:].split('/') #split by / in case /n appended
+        created = re.findall('\d{4}-\d{1,2}-\d{1,2}', task)[-1]
+        offset = int(days[0])
+
+        # get date task should have been done on (as it may not be today)
+        base_date = add_days(created, int(days[-1]))
+        due = add_days(base_date, offset)
+
+        # figure out if task has been done on the assigned day, if so assign diff in tag
+
     else:
-        pass
+        offset = 1
+        i = today[3] + 1
+        while i != today[3]:
+            if i > 6:
+                i = 0
+            if weekdays[i] in days:
+                break
+            i += 1
+            offset += 1
+        due = add_days(today_string, offset)
+
+
     removed = do(task)
+    fresh_task = strip_prefixes(task)
+    fresh_task = '{} {}'.format(today_string, fresh_task)
     fresh_task = assign_duedate(fresh_task, due)
+
+    file.append(removed)
+    return fresh_task
 
 def main(argv):
     # argument-less functionality
@@ -677,6 +720,8 @@ def main(argv):
             file[linenum] = recur_set(task, argv[2])
         elif argv[1] == "usr":
             file[linenum] = recur_unset(task)
+        elif argv[1] == "rr":
+            file[linenum] = recur_recycle(task)
     else:
         return
 

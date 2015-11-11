@@ -65,6 +65,10 @@ def assign_duedate(task, due):
 
 def schedule(task, date):
 
+    this_year_month_lengths = month_lengths[:]
+    if today[0] % 4 == 0:
+        this_year_month_lengths[1] += 1
+
     future_num = re.search('3\d{7}\s', task)
     if future_num:
         task = unset_future(task)
@@ -88,7 +92,7 @@ def schedule(task, date):
             day -= month+length[today[1]-1]
     else:
         print('invalid date format')
-        return
+        return task
 
     # increment month if day is lower than today
     if day < today[2] and month == None:
@@ -96,7 +100,7 @@ def schedule(task, date):
         if month > 12:
             month = 1
 
-    # set unset months and years now that we've dealt with monthless cases
+    # set unset months and years
     if not month: month = today[1]
     if not year: year = today[0]
 
@@ -107,10 +111,10 @@ def schedule(task, date):
     # handle edge cases where impossible dates are entered.
     if month > 12:
         print("Month must be 12 or below")
-        return
+        return task
     if day > month_lengths[month-1]:
         print("Not that many days in the month")
-        return
+        return task
 
     due = '{}-{:0=2d}-{:0=2d}'.format(year, month, day)
 
@@ -197,7 +201,8 @@ def unset_project(task, num=1):
 def view_list():
     """print all lines in file"""
     for i, line in enumerate(file):
-        print("%d %s" % (i, line.strip()))
+        if not line.startswith('x'):
+            print("%d %s" % (i, line.strip()))
 
 def reorder():
     """Placeholder for complex reorder op"""
@@ -264,14 +269,14 @@ def view_children():
             parents.insert(insert_point, parents.pop(i))
             insert_point += 1
         i += 1
-    sorted = insert_point  # number of entries from top that are sorted
+    sorted_parents = insert_point  # number of entries from top that are sorted
     # iterate over sorted tasks, looking for all unsorted children parents
     # put each child task under parent
     i = 0
-    while i < sorted: #iterate over all sorted tasks
+    while i < sorted_parents: #iterate over all sorted tasks
         child_tag = 'C:' + str(parents[i][0])
         insert_point = i + 1
-        j = sorted  # number of sorted = index of first unsorted
+        j = sorted_parents  # number of sorted = index of first unsorted
         while j < len(parents): # iterate over unsorted tasks
             if child_tag in parents[j][1]:
                 parents.insert(insert_point, parents.pop(j))
@@ -304,19 +309,19 @@ def view_children():
         # closed/open indicator, set switch to hide following tasks
         parent_tag = re.search('P:\w+', line)
         if parent_tag:
-            parent_tag = line[parent_tag.start():parent_tag.end()]
-            if 'c' not in parent_tag:
+            latest_parent_id = parent_tag.group().replace('c', '')[2:]
+            if 'c' not in parent_tag.group():
                 line = '\033[31m+\033[39m ' + line
             else:
                 line = '\033[31m-\033[39m ' + line
-                closed_id = parent_tag[2:-1]
+                closed_id = latest_parent_id
         #align non plus or minused tasks
         else:
             line = '  ' + line
         #calc indent level based on degree of nested child tags
         child_code = re.search('C:\w+', line)
         if child_code:
-            child_code = line[child_code.start()+2:child_code.end()]
+            child_code = child_code.group()[2:]
             if child_code not in hierarchy:
                 hierarchy.append(child_code)
             else:
@@ -325,6 +330,7 @@ def view_children():
             line = "   " * indents + line
         else:
             hierarchy = []
+        #if the closed_id is in the hierarchy, then the task will be hidden
         if closed_id not in hierarchy:
             print(line[:-1])
 
@@ -543,6 +549,17 @@ def recur_set(task, days):
         print('Not a valid recur format')
         return task
 
+    dates = re.findall('\d{4}-\d{2}-\d{2}', task)
+    if len(dates) == 2:
+        due, created = dates
+        correction = get_days_diff(due - created)
+        tag += 'c' + correction
+    elif len(dates) == 1:
+        tag += 'c0'
+    else:
+        print('This task needs a due date')
+        return task
+
     # remove old recur tag
     if 'R:' in task:
         task = recur_unset(task)
@@ -588,20 +605,39 @@ def strip_prefixes(task):
     return ' '.join(task[start:])
 
 def recur_recycle(task):
-    days = re.search('R:\w+', task).group()[2:]
+
+    # fix first run of e10, so doing it doesnt schedule 20 days later
+    # could add c0 to first run
+    # allow creation of e tasks on any day, correct to compensate
+
+    tag = re.search('R:\w+', task)
+    days = tag.group()[2:]
     if 'a' in days:
         offset = int(days[1:])
         due = add_days(today_string, offset)
     elif 'e' in days:
-        days = days[1:].split('/') #split by / in case /n appended
+        days = days[1:].split('c') #split by / in case /n appended
         created = re.findall('\d{4}-\d{1,2}-\d{1,2}', task)[-1]
         offset = int(days[0])
 
         # get date task should have been done on (as it may not be today)
         base_date = add_days(created, int(days[-1]))
-        due = add_days(base_date, offset)
 
-        # figure out if task has been done on the assigned day, if so assign diff in tag
+        # assign due off of base date, make sure after today
+        due = add_days(base_date, offset)
+        while get_days_diff(due, today_string) < 1:
+            due = add_days(base_date, offset)
+
+        # figure out correction offset if today wasn't the due day
+        # apply to tag
+        if due != add_days(today_string, offset):
+            correction = get_days_diff(due, today_string)
+            task = '{}R:e{}c{}{}'.format(task[:tag.start()], offset,
+                correction, task[tag.end():])
+        # if we are aligned, and there is a correction offset, remove it
+        elif len(days) > 1:
+            task = '{}R:e{}{}'.format(task[:tag.start()], offset,
+                task[tag.end():])
 
     else:
         offset = 1

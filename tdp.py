@@ -1,7 +1,6 @@
 #!/usr/bin/python
 import sys
 import datetime
-import calendar
 import re
 import readline
 
@@ -14,17 +13,20 @@ today = [int(i) for i in list(filter(None, today.split(' ')))]
 today_string = '{}-{:0=2d}-{:0=2d}'.format(today[0], today[1], today[2])
 month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
+
 def add(words):
     created = datetime.date.today().strftime("%Y-%m-%d")
     s = ' '.join(words)
     task = "%s %s\n" % (created, s)
     file.append(task)
 
+
 def remove_task(task, linenum):
     followthrough = input('Task: {}\nDelete? (Y/n)'.format(task.strip()))
     if followthrough == '' or followthrough.lower() == 'y':
         removed = file.pop(linenum)
         print('Removed: ' + removed.strip())
+
 
 def prefill_input(prompt, prefill):
     readline.set_startup_hook(lambda: readline.insert_text(prefill))
@@ -34,13 +36,16 @@ def prefill_input(prompt, prefill):
         readline.set_startup_hook()
     return result
 
+
 def edit(task):
     task = prefill_input('Edit task: ', task.strip())
     return task + '\n'
 
+
 def do(task):
     completed = datetime.date.today().strftime("%Y-%m-%d")
     return "x %s %s" % (completed, task)
+
 
 def undo(task):
     if task.startswith('x '):
@@ -49,6 +54,7 @@ def undo(task):
         print('This task was never completed')
         return task
 
+
 def unschedule(task):
     dates = re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task)
     if dates:
@@ -56,12 +62,14 @@ def unschedule(task):
     else:
         return task
 
+
 def assign_duedate(task, due):
-    task = unschedule(task) #returns unchanged if not scheduled
-    if task.startswith('('): # insert behind priority if one is set
+    task = unschedule(task)  # returns unchanged if not scheduled
+    if task.startswith('('):  # insert behind priority if one is set
         return '%s%s %s' % (task[:4], due, task[4:])
     else:
         return '%s %s' % (due, task)
+
 
 def schedule(task, date):
 
@@ -71,7 +79,7 @@ def schedule(task, date):
 
     future_num = re.search('3\d{7}\s', task)
     if future_num:
-        task = unset_future(task)
+        task = future_unset(task)
 
     # catch various date formats, set them up for processing
     if re.match('\d{1,2}$', date):
@@ -89,20 +97,22 @@ def schedule(task, date):
             offset = 7 - (today[3] - daynum)
         day = today[2] + offset
         if day > month_lengths[today[1]-1]:
-            day -= month+length[today[1]-1]
+            day -= month_lengths[today[1]-1]
     else:
         print('invalid date format')
         return task
 
     # increment month if day is lower than today
-    if day < today[2] and month == None:
+    if day < today[2] and month is None:
         month = today[1] + 1
         if month > 12:
             month = 1
 
     # set unset months and years
-    if not month: month = today[1]
-    if not year: year = today[0]
+    if not month:
+        month = today[1]
+    if not year:
+        year = today[0]
 
     # if month lower than today's, due next year.
     if month < today[1]:
@@ -124,12 +134,14 @@ def schedule(task, date):
 def postpone():
     pass
 
+
 def prioritize(task, priority='A'):
     if re.match('\([A-Z]\)\s', task):
         print("Task already prioritized")
-        #change to deprioritize
+        # change to deprioritize
         return
     return '({}) {}'.format(priority, task)
+
 
 def unprioritize(task):
     if re.match('\([A-Z]\)\s', task):
@@ -138,6 +150,7 @@ def unprioritize(task):
         print('Task not prioritized')
         return task
 
+
 def get_contexts():
     contexts = set([])
     for line in file:
@@ -145,19 +158,22 @@ def get_contexts():
             contexts.add(c)
     return contexts
 
+
 def set_context(task, context):
     if '@' + context in task:
         print("That context is already assigned")
         return task
     insert_before = re.search('P:|C:|R:', task)
     if insert_before:
-        return '{}@{} {}'.format(task[:insert_before.start()], \
-                context, task[insert_before.start():])
+        return '{}@{} {}'.format(task[:insert_before.start()],
+                                 context, task[insert_before.start():])
     else:
         return task[:-1] + ' @' + context + task[-1:]
 
+
 def set_context_guided(task):
     pass
+
 
 def unset_context(task, num=1):
     contexts = [m for m in re.finditer('@\w+', task)]
@@ -168,6 +184,7 @@ def unset_context(task, num=1):
     end = contexts[num-1].end()
     return task[:start-1] + task[end:]
 
+
 def get_projects():
     projects = set([])
     for line in file:
@@ -175,19 +192,22 @@ def get_projects():
             projects.add(c)
     return projects
 
+
 def set_project(task, project):
     if '+' + project in task:
         print("That project is already assigned")
         return task
     insert_before = re.search('@\w+|P:|C:|R:', task)
     if insert_before:
-        return '{}+{} {}'.format(task[:insert_before.start()], \
-                project, task[insert_before.start():])
+        return '{}+{} {}'.format(task[:insert_before.start()],
+                                 project, task[insert_before.start():])
     else:
-        return task[:-1] + ' +' + context + task[-1:]
+        return task[:-1] + ' +' + project + task[-1:]
+
 
 def set_project_guided():
     pass
+
 
 def unset_project(task, num=1):
     projects = [m for m in re.finditer('\+\w+', task)]
@@ -198,15 +218,18 @@ def unset_project(task, num=1):
     end = projects[num-1].end()
     return task[:start-1] + task[end:]
 
+
 def view_list():
     """print all lines in file"""
     for i, line in enumerate(file):
         if not line.startswith('x'):
             print("%d %s" % (i, line.strip()))
 
+
 def reorder():
     """Placeholder for complex reorder op"""
     file.sort()
+
 
 def view(match, exclude=False):
     """
@@ -221,8 +244,9 @@ def view(match, exclude=False):
         if match in line:
             print("%d %s" % (i, line.strip()))
 
+
 def view_today():
-    #change to print all before tomorrow. not containing @future
+    # change to print all before tomorrow. not containing @future
     """Print all tasks containing the current date"""
     lines = ['%d %s' % (i, l) for i, l in enumerate(file)]
     today_int = int('{}{:0=2d}{:0=2d}'.format(today[0], today[1], today[2]))
@@ -245,6 +269,7 @@ def project_view():
         for line in facade:
             if project in line:
                 print(line.strip())
+
 
 def view_children():
     facade = ['%d %s' % (i, l) for i, l in enumerate(file)]
@@ -273,11 +298,11 @@ def view_children():
     # iterate over sorted tasks, looking for all unsorted children parents
     # put each child task under parent
     i = 0
-    while i < sorted_parents: #iterate over all sorted tasks
+    while i < sorted_parents:  # iterate over all sorted tasks
         child_tag = 'C:' + str(parents[i][0])
         insert_point = i + 1
         j = sorted_parents  # number of sorted = index of first unsorted
-        while j < len(parents): # iterate over unsorted tasks
+        while j < len(parents):  # iterate over unsorted tasks
             if child_tag in parents[j][1]:
                 parents.insert(insert_point, parents.pop(j))
                 insert_point += 1
@@ -286,7 +311,7 @@ def view_children():
 
     # rearrange children to follow their parents
     for id, line in parents:
-        #pop children from facade
+        # pop children from facade
         children = []
         list_length = len(facade)
         i = 0
@@ -302,7 +327,7 @@ def view_children():
             facade.insert(insert_point, child)
             insert_point += 1
 
-    #pretty indented print
+    # pretty indented print
     hierarchy = []
     closed_id = 0
     for line in facade:
@@ -315,10 +340,10 @@ def view_children():
             else:
                 line = '\033[31m-\033[39m ' + line
                 closed_id = latest_parent_id
-        #align non plus or minused tasks
+        # align non plus or minused tasks
         else:
             line = '  ' + line
-        #calc indent level based on degree of nested child tags
+        # calc indent level based on degree of nested child tags
         child_code = re.search('C:\w+', line)
         if child_code:
             child_code = child_code.group()[2:]
@@ -330,9 +355,10 @@ def view_children():
             line = "   " * indents + line
         else:
             hierarchy = []
-        #if the closed_id is in the hierarchy, then the task will be hidden
+        # if the closed_id is in the hierarchy, then the task will be hidden
         if closed_id not in hierarchy:
             print(line[:-1])
+
 
 def unset_parent(task):
     """takes task string argument, return string without parent tag"""
@@ -340,6 +366,7 @@ def unset_parent(task):
     start = tag.start()
     end = tag.end()
     return task[:start-1] + task[end:]
+
 
 def set_parent(task):
     if 'P:' in task:
@@ -357,10 +384,11 @@ def set_parent(task):
             i += 1
     insert_before = re.search('O:', task)
     if insert_before:
-        return '{}P:{} {}'.format(task[:insert_before.start()], \
-                parent_id, task[insert_before.start():])
+        return '{}P:{} {}'.format(task[:insert_before.start()],
+                                  parent_id, task[insert_before.start():])
     else:
         return task[:-1] + ' P:' + str(parent_id) + task[-1:], parent_id
+
 
 def evaluate_parent(id):
     """check for children matching the parent id,
@@ -391,12 +419,13 @@ def unset_child(task):
     evaluate_parent(id)
     return task[:start-1] + task[end:]
 
+
 def set_child(task, parent_linenum):
 
-    #get parent line from linenum
+    # get parent line from linenum
     parent = file[int(parent_linenum)]
 
-    #get if parent is already parent get id, else set as parent
+    # get if parent is already parent get id, else set as parent
     parent_tag = re.search('P:\d+', parent)
     if parent_tag:
         parent_id = parent[parent_tag.start()+2:parent_tag.end()]
@@ -410,10 +439,11 @@ def set_child(task, parent_linenum):
         task = unset_child(task)
     insert_before = re.search('P:|O:', task)
     if insert_before:
-        return '{}{} {}'.format(task[:insert_before.start()], \
-                child_tag, task[insert_before.start():])
+        return '{}{} {}'.format(task[:insert_before.start()],
+                                child_tag, task[insert_before.start():])
     else:
         return task[:-1] + ' ' + child_tag + task[-1:]
+
 
 def contract(task):
     parent_tag = re.search('P:\d+(?!c)', task)
@@ -421,12 +451,14 @@ def contract(task):
         return task[:parent_tag.end()]+'c'+task[parent_tag.end():]
     return task
 
+
 def expand(task):
     parent_tag = re.search('P:\d+c', task)
     if parent_tag:
         return task[:parent_tag.end()-1]+task[parent_tag.end():]
     else:
         return task
+
 
 def future_unset(task):
     future_num = re.search('3\d{7}\s', task)
@@ -437,6 +469,7 @@ def future_unset(task):
     else:
         return task
 
+
 def future_find_last_num():
     for i in range(len(file)-1, -1, -1):
         last_future_num = re.search('3\d{7}\s', file[i])
@@ -444,14 +477,16 @@ def future_find_last_num():
             return int(last_future_num.group()[1:])
     return None
 
+
 def future_assign_num(task, num):
     future_num = re.search('3\d{7}\s', task)
     if future_num:
         task = future_unset(task)
-    if task.startswith('('): # insert behind priority if one is set
+    if task.startswith('('):  # insert behind priority if one is set
         return '{}3{:0=7d} {}'.format(task[:4], num, task[4:])
     else:
         return '3{:0=7d} {}'.format(num, task)
+
 
 def future_set(task):
     if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
@@ -464,6 +499,7 @@ def future_set(task):
     else:
         return future_assign_num(task, 10000)
 
+
 def future_redistribute():
     file.sort()
     last_num = 0
@@ -474,12 +510,14 @@ def future_redistribute():
             file[i] = future_assign_num(line, num)
             last_num = num
 
+
 def future_get_num(task):
     num = re.search('3\d{7}\s', task)
     if num:
         return int(num.group()[1:])
     else:
         return None
+
 
 def future_order_after(moved_index, pivot_index):
     # get num of target (pivot) task
@@ -492,7 +530,7 @@ def future_order_after(moved_index, pivot_index):
     if pivot_index + 1 < len(file):
         # if there is a line, check for future num.
         adjacent_num = future_get_num(file[pivot_index+1])
-        #if there is a future num, make num half the difference with pivot
+        # if there is a future num, make num half the difference with pivot
         if adjacent_num:
             half_diff = (adjacent_num - pivot_num) // 2
             num = pivot_num + half_diff
@@ -508,6 +546,7 @@ def future_order_after(moved_index, pivot_index):
     # in the rare event the num reaches > 9999999, redist
     if adjacent_num - pivot_num < 4 or num > 9999999:
         future_redistribute()
+
 
 def future_order_before(moved_index, pivot_index):
     # get num of target (pivot) task
@@ -530,11 +569,13 @@ def future_order_before(moved_index, pivot_index):
     if pivot_num - adjacent_num < 4:
         future_redistribute()
 
+
 def recur_unset(task):
     tag = re.search('R:\w+', task)
     start = tag.start()
     end = tag.end()
     return task[:start-1] + task[end:]
+
 
 def recur_set(task, days):
     # makes recur tag
@@ -566,10 +607,11 @@ def recur_set(task, days):
 
     insert_before = re.search('P:|C:', task)
     if insert_before:
-        return '{}{} {}'.format(task[:insert_before.start()], \
-                tag, task[insert_before.start():])
+        return '{}{} {}'.format(task[:insert_before.start()],
+                                tag, task[insert_before.start():])
     else:
         return task[:-1] + ' ' + tag + task[-1:]
+
 
 def add_days(date, num):
     year, month, day = date.split('-')
@@ -583,15 +625,19 @@ def add_days(date, num):
             month = 0
     return '{}-{:0=2d}-{:0=2d}'.format(year, month+1, day)
 
+
 def days_since_2000(date):
     date = [int(n) for n in date.split('-')]
     date_yeardays = (date[0]-2000) * 365 + (date[0]-2001) // 4
     date_monthdays = sum([month_lengths[n] for n in range(date[1]-1)])
-    if date[1] > 2 and date[0] % 4 == 0: date_monthdays += 1
+    if date[1] > 2 and date[0] % 4 == 0:
+        date_monthdays += 1
     return date_yeardays + date_monthdays + date[2]
+
 
 def get_days_diff(date1, date2):
     return days_since_2000(date1) - days_since_2000(date2)
+
 
 def strip_prefixes(task):
     task = task.split(' ')
@@ -603,6 +649,7 @@ def strip_prefixes(task):
         else:
             break
     return ' '.join(task[start:])
+
 
 def recur_recycle(task):
 
@@ -616,7 +663,7 @@ def recur_recycle(task):
         offset = int(days[1:])
         due = add_days(today_string, offset)
     elif 'e' in days:
-        days = days[1:].split('c') #split by / in case /n appended
+        days = days[1:].split('c')  # split by / in case /n appended
         created = re.findall('\d{4}-\d{1,2}-\d{1,2}', task)[-1]
         offset = int(days[0])
 
@@ -633,11 +680,11 @@ def recur_recycle(task):
         if due != add_days(today_string, offset):
             correction = get_days_diff(due, today_string)
             task = '{}R:e{}c{}{}'.format(task[:tag.start()], offset,
-                correction, task[tag.end():])
+                                         correction, task[tag.end():])
         # if we are aligned, and there is a correction offset, remove it
         elif len(days) > 1:
             task = '{}R:e{}{}'.format(task[:tag.start()], offset,
-                task[tag.end():])
+                                      task[tag.end():])
 
     else:
         offset = 1
@@ -651,7 +698,6 @@ def recur_recycle(task):
             offset += 1
         due = add_days(today_string, offset)
 
-
     removed = do(task)
     fresh_task = strip_prefixes(task)
     fresh_task = '{} {}'.format(today_string, fresh_task)
@@ -659,6 +705,7 @@ def recur_recycle(task):
 
     file.append(removed)
     return fresh_task
+
 
 def main(argv):
     # argument-less functionality
@@ -682,7 +729,7 @@ def main(argv):
         except:
             print("you need to write a task")
     elif argv[0] == "sort":
-        sort()
+        reorder()
     elif argv[0] == "today":
         view_today()
     # commands that target tasks
@@ -715,7 +762,7 @@ def main(argv):
         elif argv[1] == 'up':
             file[linenum] = unprioritize(task)
         elif argv[1] == "c":
-   #         try:
+            #try:
                 file[linenum] = set_context(task, argv[2])
     #        except:
     #            file[linenum] = set_context_guided(task)

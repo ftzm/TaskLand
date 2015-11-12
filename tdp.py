@@ -295,17 +295,19 @@ def view_children():
             insert_point += 1
         i += 1
     sorted_parents = insert_point  # number of entries from top that are sorted
+
     # iterate over sorted tasks, looking for all unsorted children parents
-    # put each child task under parent
+    # put each child parent under its parent
+
     i = 0
-    while i < sorted_parents:  # iterate over all sorted tasks
+    while i < sorted_parents:
         child_tag = 'C:' + str(parents[i][0])
         insert_point = i + 1
-        j = sorted_parents  # number of sorted = index of first unsorted
-        while j < len(parents):  # iterate over unsorted tasks
+        j = sorted_parents
+        while j < len(parents):
             if child_tag in parents[j][1]:
                 parents.insert(insert_point, parents.pop(j))
-                insert_point += 1
+                sorted_parents += 1
             j += 1
         i += 1
 

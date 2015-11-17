@@ -3,8 +3,15 @@ import sys
 import datetime
 import re
 import readline
+import os
 
-with open("todo.txt", "r") as f:
+__location__ = os.path.realpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+with open(os.path.join(__location__, "config.rc"), "r") as f:
+    todolist = f.readlines()[0].strip()
+
+with open(todolist, "r") as f:
     file = f.readlines()
 
 weekdays = ['u', 'm', 't', 'w', 'r', 'f', 's']
@@ -131,24 +138,18 @@ def schedule(task, date):
     return assign_duedate(task, due)
 
 
-def postpone():
-    pass
-
-
-def prioritize(task, priority='A'):
-    if re.match('\([A-Z]\)\s', task):
-        print("Task already prioritized")
-        # change to deprioritize
-        return
-    return '({}) {}'.format(priority, task)
-
-
 def unprioritize(task):
     if re.match('\([A-Z]\)\s', task):
         return task[4:]
     else:
         print('Task not prioritized')
         return task
+
+
+def prioritize(task, priority='A'):
+    if re.match('\([A-Z]\)\s', task):
+        unprioritize(task)
+    return '({}) {}'.format(priority, task)
 
 
 def get_contexts():
@@ -159,20 +160,18 @@ def get_contexts():
     return contexts
 
 
-def set_context(task, context):
-    if '@' + context in task:
-        print("That context is already assigned")
-        return task
-    insert_before = re.search('P:|C:|R:', task)
-    if insert_before:
-        return '{}@{} {}'.format(task[:insert_before.start()],
-                                 context, task[insert_before.start():])
-    else:
-        return task[:-1] + ' @' + context + task[-1:]
-
-
-def set_context_guided(task):
-    pass
+def set_context(task, contexts):
+    for context in contexts:
+        if '@' + context in task:
+            print("Context @{} is already assigned".format(context))
+            break
+        insert_before = re.search('P:|C:|R:', task)
+        if insert_before:
+            task = '{}@{} {}'.format(task[:insert_before.start()],
+                                     context, task[insert_before.start():])
+        else:
+            task = task[:-1] + ' @' + context + task[-1:]
+    return task
 
 
 def unset_context(task, num=1):
@@ -188,9 +187,15 @@ def unset_context(task, num=1):
 def get_projects():
     projects = set([])
     for line in file:
-        for c in re.findall('\+\w+', line):
-            projects.add(c)
+        for p in re.findall('\+\w+', line):
+            projects.add(p)
     return projects
+
+
+def print_projects():
+    projects = get_projects()
+    for project in projects:
+        print(project.replace('+', ''))
 
 
 def set_project(task, project):
@@ -205,10 +210,6 @@ def set_project(task, project):
         return task[:-1] + ' +' + project + task[-1:]
 
 
-def set_project_guided():
-    pass
-
-
 def unset_project(task, num=1):
     projects = [m for m in re.finditer('\+\w+', task)]
     if num > len(projects):
@@ -219,64 +220,134 @@ def unset_project(task, num=1):
     return task[:start-1] + task[end:]
 
 
-def view_list():
-    """print all lines in file"""
-    for i, line in enumerate(file):
-        if not line.startswith('x'):
-            print("%d %s" % (i, line.strip()))
-
-
 def reorder():
     """Placeholder for complex reorder op"""
     file.sort()
 
 
-def view(match, exclude=False):
-    """
-    Filter function. prints only lines including first argument and
-    excluding second argument
-    """
-    if exclude:
-        lines = [l for l in file if exclude not in l]
-    else:
-        lines = file
-    for i, line in enumerate(lines):
-        if match in line:
-            print("%d %s" % (i, line.strip()))
+def fetch_lines():
+    output_lines = ['%d %s' % (i, l) for i, l in enumerate(file)]
+    return output_lines
 
 
-def view_today():
-    # change to print all before tomorrow. not containing @future
-    """Print all tasks containing the current date"""
-    lines = ['%d %s' % (i, l) for i, l in enumerate(file)]
-    today_int = int('{}{:0=2d}{:0=2d}'.format(today[0], today[1], today[2]))
+def view_including(lines, args):
+    """Filter function. prints only lines including first argument"""
+    output_lines = []
     for line in lines:
-        if '@future' in line:
-            continue
+        for s in args:
+            if s in line:
+                output_lines.append(line)
+    return output_lines
+
+
+def view_excluding(lines, args):
+    """Filter function. prints only lines excluding argument"""
+    output_lines = []
+    for line in lines:
+        for s in args:
+            if s not in line:
+                output_lines.append(line)
+    return output_lines
+
+
+def view_until(lines, date):
+    date_int = int(date.replace('-', ''))
+    output_lines = []
+    for line in lines:
         due = re.search('\d{4}-\d{2}-\d{2}', line)
         if due:
             due_int = int(due.group().replace('-', ''))
-            if due_int <= today_int:
-                print(line.strip())
+            if due_int <= date_int:
+                output_lines.append(line)
+    return output_lines
 
 
-def project_view():
-    """For every project, prints every task containing that tag"""
-    facade = ['%d %s' % (i, l) for i, l in enumerate(file)]
+def view_today(lines):
+    return view_until(lines, today_string)
+
+
+def view_this_week(lines):
+    return view_until(lines, add_days(today_string, 7))
+
+
+def view_by_project(lines):
+    """For every project, returns every task containing that tag"""
+    output_lines = []
     projects = sorted(list(get_projects()))
     for project in projects:
-        print(project)
-        for line in facade:
+        for line in lines:
             if project in line:
-                print(line.strip())
+                output_lines.append(line)
+    return output_lines
 
 
-def view_children():
-    facade = ['%d %s' % (i, l) for i, l in enumerate(file)]
+def view_by_context(lines):
+    """For every context, returns every task containing that tag"""
+    output_lines = []
+    contexts = sorted(list(get_projects()))
+    for context in contexts:
+        for line in lines:
+            if context in line:
+                output_lines.append(line)
+    return output_lines
 
+
+def view_projects(lines, args):
+    filter_projects = ['+' + p for p in args]
+    output_lines = []
+
+    # verify filter projects
+    existing_projects = get_projects()
+    remaining_filter_projects = len(filter_projects)
+    i = 0
+    while i > remaining_filter_projects:
+        if filter_projects[i] not in existing_projects:
+            print("{} is not an existing project".format(filter_projects[i]))
+            filter_projects.pop(i)
+            remaining_filter_projects -= 1
+        else:
+            i += 1
+
+    for line in lines:
+        for project in filter_projects:
+            if project in line:
+                output_lines.append(line)
+                break
+
+    return output_lines
+
+
+def view_contexts(lines, args):
+    filter_contexts = ['@' + p for p in args]
+    output_lines = []
+
+    # verify filter contexts
+    existing_contexts = get_contexts()
+    remaining_filter_contexts = len(filter_contexts)
+    i = 0
+    while i > remaining_filter_contexts:
+        if filter_contexts[i] not in existing_contexts:
+            print("{} is not an existing context".format(filter_contexts[i]))
+            filter_contexts.pop(i)
+            remaining_filter_contexts -= 1
+        else:
+            i += 1
+
+    for line in lines:
+        for context in filter_contexts:
+            if context in line:
+                output_lines.append(line)
+                break
+
+    return output_lines
+
+
+def nest(lines):
+
+    output_lines = []
     # make list of parent nums and line stings tuples
     parents = []
-    for line in facade:
+    for line in lines:
         parent = re.search('P:\d+', line)
         if parent:
             num = line[parent.start()+2:parent.end()]
@@ -308,31 +379,34 @@ def view_children():
             if child_tag in parents[j][1]:
                 parents.insert(insert_point, parents.pop(j))
                 sorted_parents += 1
+                insert_point += 1
             j += 1
         i += 1
 
     # rearrange children to follow their parents
     for id, line in parents:
-        # pop children from facade
+        # pop children from lines
         children = []
-        list_length = len(facade)
+        list_length = len(lines)
         i = 0
         while i < list_length:
-            if 'C:'+id in facade[i]:
-                children.append(facade.pop(i))
+            if 'C:'+id in lines[i]:
+                children.append(lines.pop(i))
                 list_length -= 1
             else:
                 i += 1
         # find where to insert and insert all children
-        insert_point = facade.index(line) + 1
+        insert_point = lines.index(line) + 1
         for child in children:
-            facade.insert(insert_point, child)
+            lines.insert(insert_point, child)
             insert_point += 1
 
     # pretty indented print
     hierarchy = []
     closed_id = 0
-    for line in facade:
+    latest_parent_id = 0
+    for line in lines:
+        orphan = False
         # closed/open indicator, set switch to hide following tasks
         parent_tag = re.search('P:\w+', line)
         if parent_tag:
@@ -350,16 +424,34 @@ def view_children():
         if child_code:
             child_code = child_code.group()[2:]
             if child_code not in hierarchy:
-                hierarchy.append(child_code)
+                # necessary to check if child is orphan
+                if child_code == latest_parent_id:
+                    hierarchy.append(child_code)
+                else:
+                    hierarchy = []
+                    orphan = True
             else:
                 hierarchy = hierarchy[:hierarchy.index(child_code)+1]
-            indents = hierarchy.index(child_code)+1
+            if not orphan:
+                indents = hierarchy.index(child_code)+1
+            else:
+                indents = 0
             line = "   " * indents + line
         else:
             hierarchy = []
         # if the closed_id is in the hierarchy, then the task will be hidden
         if closed_id not in hierarchy:
-            print(line[:-1])
+            output_lines.append(line)
+
+    return output_lines
+
+
+def clean(lines):
+    output_lines = []
+    for line in lines:
+        output_lines.append(re.sub(
+            '\d{4}-\d{2}-\d{2}\s|3\d{7}|P:\w|C:\w|R:\w', '', line))
+    return output_lines
 
 
 def unset_parent(task):
@@ -384,7 +476,7 @@ def set_parent(task):
             parent_id = i
         else:
             i += 1
-    insert_before = re.search('O:', task)
+    insert_before = re.search('R:', task)
     if insert_before:
         return '{}P:{} {}'.format(task[:insert_before.start()],
                                   parent_id, task[insert_before.start():])
@@ -439,7 +531,7 @@ def set_child(task, parent_linenum):
         return task
     if 'C:' in task:
         task = unset_child(task)
-    insert_before = re.search('P:|O:', task)
+    insert_before = re.search('P:|C:', task)
     if insert_before:
         return '{}{} {}'.format(task[:insert_before.start()],
                                 child_tag, task[insert_before.start():])
@@ -709,113 +801,156 @@ def recur_recycle(task):
     return fresh_task
 
 
-def main(argv):
-    # argument-less functionality
-    if not argv:
-        view_today()
-    # commands without target tasks
-    elif argv[0] == "ls":
-        view_list()
-    elif argv[0] == "pv":
-        project_view()
-    elif argv[0] == "vc":
-        view_children()
-    elif argv[0] == "v":
-        try:
-            view(argv[1])
-        except:
-            print("You need a filter string")
-    elif argv[0] == "a":
-        try:
-            add(argv[1:])
-        except:
-            print("you need to write a task")
-    elif argv[0] == "sort":
-        reorder()
-    elif argv[0] == "today":
-        view_today()
-    # commands that target tasks
-    elif argv[0].isdigit():
-        linenum = int(argv[0])
-        task = file[linenum]
-        if len(argv) == 1:
-            print(task.strip())
-            return
-        if argv[1] == "do":
-            file[linenum] = do(task)
-        elif argv[1] == "undo":
-            file[linenum] = undo(task)
-        elif argv[1] == "e":
-            file[linenum] = edit(task)
-        elif argv[1] == "r":
-            remove_task(task, linenum)
-        elif argv[1] == "s":
-            try:
-                file[linenum] = schedule(task, argv[2])
-            except:
-                print("You need to supply a date")
-        elif argv[1] == "us":
-            file[linenum] = unschedule(task)
-        elif argv[1] == 'p':
-            try:
-                file[linenum] = prioritize(task, argv[2])
-            except:
-                file[linenum] = prioritize(task)
-        elif argv[1] == 'up':
-            file[linenum] = unprioritize(task)
-        elif argv[1] == "c":
-            #try:
-                file[linenum] = set_context(task, argv[2])
-    #        except:
-    #            file[linenum] = set_context_guided(task)
-        elif argv[1] == "uc":
-            try:
-                file[linenum] = unset_context(task, int(argv[2]))
-            except:
-                file[linenum] = unset_context(task)
-        elif argv[1] == "pr":
-   #         try:
-                file[linenum] = set_project(task, argv[2])
-    #        except:
-    #            file[linenum] = set_context_guided(task)
-        elif argv[1] == "upr":
-            try:
-                file[linenum] = unset_project(task, int(argv[2]))
-            except:
-                file[linenum] = unset_project(task)
-        elif argv[1] == "sc":
-            file[linenum] = set_child(task, int(argv[2]))
-        elif argv[1] == "usc":
-            file[linenum] = unset_child(task)
-        elif argv[1] == "cn":
-            file[linenum] = contract(task)
-        elif argv[1] == "ex":
-            file[linenum] = expand(task)
-        elif argv[1] == "unfut":
-            file[linenum] = future_unset(task)
-        elif argv[1] == "sf":
-            file[linenum] = future_set(task)
-        elif argv[1] == "sa":
-            future_order_after(int(argv[0]), int(argv[2]))
-        elif argv[1] == "sb":
-            future_order_before(int(argv[0]), int(argv[2]))
-        elif argv[1] == "fr":
-            future_redistribute()
-        elif argv[1] == "sr":
-            file[linenum] = recur_set(task, argv[2])
-        elif argv[1] == "usr":
-            file[linenum] = recur_unset(task)
-        elif argv[1] == "rr":
-            file[linenum] = recur_recycle(task)
-    else:
-        return
+def write_changes(lines):
+    reorder()
+    with open(todolist, "w") as f:
+        for line in lines:
+            f.write(line)
 
-    # write changes to file
-    if file:
-        reorder()
-        with open("todo.txt", "w") as f:
-            for line in file:
-                f.write(line)
+
+view_commands = {
+    'bc': (view_by_context, 0, 0),
+    'bpr': (view_by_project, 0, 0),
+    'vc': (view_contexts, 1, 9),
+    'vpr': (view_projects, 1, 9),
+    'incl': (view_including, 1, 9),
+    'excl': (view_excluding, 1, 9),
+    'today': (view_today, 0, 0),
+    'week': (view_this_week, 0, 0),
+    'until': (view_until, 0, 0),
+    'nest': (nest, 0, 0),
+    'clean': (clean, 0, 0),
+    }
+
+action_commands = {
+    'a': (add, 1, 100),
+    'rm': (remove_task, 1, 1),
+    'do': (do, 1, 1),
+    'undo': (undo, 1, 1),
+    's': (schedule, 2, 2),
+    'us': (unschedule, 1, 1),
+    'p': (prioritize, 2, 2),
+    'up': (unprioritize, 1, 1),
+    'c': (set_context, 2, 9),
+    'uc': (unset_context, 1, 1),
+    'pr': (set_project, 2, 2),
+    'upr': (unset_project, 1, 1),
+    'sub': (set_child, 2, 2),
+    'usub': (unset_child, 1, 1),
+    'cn': (contract, 1, 1),
+    'ex': (expand, 1, 1),
+    'f': (future_set, 1, 1),
+    'mb': (future_order_before, 2, 2),
+    'ma': (future_order_after, 2, 2),
+    're': (recur_set, 2, 2),
+    'ure': (recur_unset, 1, 1),
+    }
+
+
+def assemble_view_command_list(args):
+    command_list = []
+    for arg in args:
+        if arg in view_commands.keys():
+            command_args = (arg, [])
+            command_list.append(command_args)
+        else:
+            command_list[-1][1].append(arg)
+    i = 0
+    while i < len(command_list):
+        if command_list[i][0] == 'nest':
+            command_list.append(command_list.pop(i))
+        i += 1
+    i = 0
+    while i < len(command_list):
+        if command_list[i][0] == 'clean':
+            command_list.append(command_list.pop(i))
+        i += 1
+
+    return command_list
+
+
+def assemble_action_command_list(args):
+    task_text = False
+    for arg in args:
+        if task_text == False:
+            if arg in view_commands.keys():
+                command_args = (arg, [])
+                command_list.append(command_args)
+                task_text = arg == 'a'
+            else:
+                command_list[-1][1].append(arg)
+        else:
+            if arg == ',':
+                task_text = False
+            else:
+                command_list[-1][1].append(arg)
+
+    return command_list
+
+
+def verify_view_command_list(command_list):
+    for command_args in command_list:
+        command, args = command_args
+        min = view_commands[command][1]
+        max = view_commands[command][2]
+        if len(args) < min:
+            if min != max:
+                print("Error: '{}' takes at least {} argument{plural}".format(
+                    command, min, plural='' if min == 1 else 's'))
+            else:
+                print("Error: '{}' takes {} argument{plural}".format(
+                    command, min, plural='' if min == 1 else 's'))
+            return False
+        elif len(args) > max:
+            surplus = args[max]
+            if min != max:
+                print("Error: '{}' takes at most {} argument{plural}, "
+                      "and '{}' is not a command".format(
+                          command, max, surplus,
+                          plural='' if max == 1 else 's'))
+            else:
+                print("Error: '{}' takes {} argument{plural} "
+                      "and '{}' is not a command".format(
+                          command, max, surplus,
+                          plural='' if max == 1 else 's'))
+            return False
+    return True
+
+
+def execute_view_command_list(command_list):
+    lines = fetch_lines()
+    for command_args in command_list:
+        command, args = command_args
+        if not args:
+            lines = view_commands[command][0](lines)
+        else:
+            lines = view_commands[command][0](lines, args)
+    for line in lines:
+        print(line.rstrip())
+
+def execute_action_command_list(command_list):
+    lines = fetch_lines()
+    for command_args in command_list:
+        command, args = command_args
+        if not args:
+            lines = view_commands[command][0](lines)
+        else:
+            lines = view_commands[command][0](lines, args)
+    for line in lines:
+        print(line.rstrip())
+
+def main(args):
+    if args[0] in view_commands.keys():
+        command_list = assemble_view_command_list(args)
+        if not verify_view_command_list(command_list):
+            return
+        execute_view_command_list(command_list)
+    elif args[0] in action_commands.keys():
+        command_list = assemble_action_command_list(args)
+        execute_action_command_list(command_list)
+    else:
+        pass
+
 
 if __name__ == "__main__":  # why do I use this
     main(sys.argv[1:])

@@ -73,6 +73,8 @@ def edit(lines, linenum):
 
 def do(lines, linenum):
     if 'P:' in lines[linenum]:
+        id = re.search('P:(\d)', lines[linenum]).group(1)
+        lines = unset_parent(lines, linenum)
         lines = clean_orphans(lines, id)
     if 'R:' in lines[linenum]:
         lines = recur_recycle(lines, linenum)
@@ -82,7 +84,8 @@ def do(lines, linenum):
 
 
 def mark_done(lines, linenum):
-    lines = unprioritize(lines, linenum)
+    if lines[linenum].startswith('('):
+        lines = unprioritize(lines, linenum)
     completed = datetime.date.today().strftime("%Y-%m-%d")
     lines[linenum] = "x %s %s" % (completed, lines[linenum])
     return lines
@@ -648,7 +651,7 @@ def evaluate_parent(lines, id):
             # written, there will be at least 1 child remaining in the lines.
             # that's why the loop returns on >1 instead of >0
             if children > 1:
-                return
+                return lines
     for i, line in enumerate(lines):
         if "P:" + str(id) in line:
             lines = unset_parent(lines, i)
@@ -658,13 +661,27 @@ def evaluate_parent(lines, id):
 
 def unset_child(lines, linenum):
     task = lines[linenum]
-    tag = re.search('C:\w+', task)
+    tag = re.search('C:\d+', task)
     if tag:
         start = tag.start()
         end = tag.end()
         id = task[start+2:end]
         lines = evaluate_parent(lines, id)
         lines[linenum] = task[:start-1] + task[end:]
+    return lines
+
+
+def clean_orphans(lines, parent_id):
+    print(parent_id)
+    for line in lines:
+        parent_tag = 'P:' + parent_id
+        if parent_tag in line:
+            return lines
+    for i in range(len(lines)):
+        child_tag = 'C:' + parent_id
+        if child_tag in lines[i]:
+            print(1)
+            lines = unset_child(lines, i)
     return lines
 
 
@@ -686,7 +703,7 @@ def set_child(lines, linenum, parent_linenum):
     if child_tag in task:
         return lines
     if 'C:' in task:
-        task = unset_child(lines, linenum)
+        task = unset_child(lines, linenum)[linenum]
     insert_before = re.search('P:|C:', task)
     if insert_before:
         lines[linenum] = '{}{} {}'.format(

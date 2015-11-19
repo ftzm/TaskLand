@@ -21,18 +21,20 @@ today_string = '{}-{:0=2d}-{:0=2d}'.format(today[0], today[1], today[2])
 month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
-def add(words):
+def add(lines, s):
     created = datetime.date.today().strftime("%Y-%m-%d")
-    s = ' '.join(words)
     task = "%s %s\n" % (created, s)
-    file.append(task)
+    lines.append(task)
+    return lines
 
 
-def remove_task(task, linenum):
-    followthrough = input('Task: {}\nDelete? (Y/n)'.format(task.strip()))
+def remove_task(lines, linenum):
+    followthrough = input('Task: {}\nDelete? (Y/n)'.format(
+        lines[linenum].strip()))
     if followthrough == '' or followthrough.lower() == 'y':
-        removed = file.pop(linenum)
+        removed = lines.pop(linenum)
         print('Removed: ' + removed.strip())
+    return lines
 
 
 def prefill_input(prompt, prefill):
@@ -44,41 +46,77 @@ def prefill_input(prompt, prefill):
     return result
 
 
-def edit(task):
-    task = prefill_input('Edit task: ', task.strip())
-    return task + '\n'
+def edit(lines, linenum):
+    task = lines[linenum].rstrip()
+    task_parts = task.split(' ')
+    pre = []
+    desc = []
+    while len(task_parts) > 0:
+        if task_parts[0].startswith(('(', '2', '3')):
+            pre.append(task_parts.pop(0))
+        else:
+            break
+    while len(task_parts) > 0:
+        if not task_parts[0].startswith(('+', '@', 'P:', 'C:', 'R:')):
+            desc.append(task_parts.pop(0))
+        else:
+            break
+    post = task_parts
+
+    desc = prefill_input('Edit task: ', ' '.join(desc))
+
+    task = ' '.join(pre + [desc] + post) + '\n'
+
+    lines[linenum] = task
+    return lines
 
 
-def do(task):
+def do(lines, linenum):
+    if 'P:' in lines[linenum]:
+        lines = clean_orphans(lines, id)
+    if 'R:' in lines[linenum]:
+        lines = recur_recycle(lines, linenum)
+    else:
+        lines = mark_done(lines, linenum)
+    return lines
+
+
+def mark_done(lines, linenum):
+    lines = unprioritize(lines, linenum)
     completed = datetime.date.today().strftime("%Y-%m-%d")
-    return "x %s %s" % (completed, task)
+    lines[linenum] = "x %s %s" % (completed, lines[linenum])
+    return lines
 
 
-def undo(task):
+def undo(lines, linenum):
+    task = lines[linenum]
     if task.startswith('x '):
-        return task[13:]
+        lines[linenum] = task[13:]
     else:
         print('This task was never completed')
-        return task
+    return lines
 
 
-def unschedule(task):
+def unschedule(lines, linenum):
+    task = lines[linenum]
     dates = re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task)
     if dates:
-        return task[:dates.start()] + task[dates.start()+11:]
-    else:
-        return task
+        lines[linenum] = task[:dates.start()] + task[dates.start()+11:]
+    return lines
 
 
-def assign_duedate(task, due):
-    task = unschedule(task)  # returns unchanged if not scheduled
+def assign_duedate(lines, linenum, due):
+    # returns unchanged if not scheduled
+    task = unschedule(lines, linenum)[linenum]
     if task.startswith('('):  # insert behind priority if one is set
-        return '%s%s %s' % (task[:4], due, task[4:])
+        lines[linenum] = '%s%s %s' % (task[:4], due, task[4:])
     else:
-        return '%s %s' % (due, task)
+        lines[linenum] = '%s %s' % (due, task)
+    return lines
 
 
-def schedule(task, date):
+def schedule(lines, linenum, date):
+    task = lines[linenum]
 
     this_year_month_lengths = month_lengths[:]
     if today[0] % 4 == 0:
@@ -86,7 +124,7 @@ def schedule(task, date):
 
     future_num = re.search('3\d{7}\s', task)
     if future_num:
-        task = future_unset(task)
+        lines = future_unset(lines, linenum)
 
     # catch various date formats, set them up for processing
     if re.match('\d{1,2}$', date):
@@ -105,6 +143,8 @@ def schedule(task, date):
         day = today[2] + offset
         if day > month_lengths[today[1]-1]:
             day -= month_lengths[today[1]-1]
+    elif date in ('today', 'n'):
+        year, month, day = tuple([int(i) for i in today_string.split('-')])
     else:
         print('invalid date format')
         return task
@@ -135,32 +175,53 @@ def schedule(task, date):
 
     due = '{}-{:0=2d}-{:0=2d}'.format(year, month, day)
 
-    return assign_duedate(task, due)
+    lines = assign_duedate(lines, linenum, due)
+    return lines
 
 
-def unprioritize(task):
+def catch(lines):
+    linenums = []
+    for i, line in enumerate(lines):
+        date = re.search('\d{4}-\d{2}-\d{2}', line)
+        if date:
+            if date.group() < today_string:
+                linenums.append(i)
+    for linenum in linenums:
+        new_due = input('Task: {}Due:  '.format(lines[linenum]))
+        lines = schedule(lines, linenum, new_due)
+    return lines
+
+
+def unprioritize(lines, linenum):
+    task = lines[linenum]
     if re.match('\([A-Z]\)\s', task):
-        return task[4:]
+        lines[linenum] = task[4:]
     else:
         print('Task not prioritized')
-        return task
+    return lines
 
 
-def prioritize(task, priority='A'):
-    if re.match('\([A-Z]\)\s', task):
-        unprioritize(task)
-    return '({}) {}'.format(priority, task)
+def prioritize(lines, linenum, priority='A'):
+    if re.match('\([A-Z]\)\s', lines[linenum]):
+        unprioritize(lines, linenum)
+    if not priority.isalpha() or len(priority) > 1:
+        print("Not a valid priority")
+    else:
+        priority = priority.upper()
+        lines[linenum] = '({}) {}'.format(priority, lines[linenum])
+    return lines
 
 
-def get_contexts():
+def get_contexts(lines):
     contexts = set([])
-    for line in file:
+    for line in lines:
         for c in re.findall('@\w+', line):
             contexts.add(c)
     return contexts
 
 
-def set_context(task, contexts):
+def set_context(lines, linenum, *contexts):
+    task = lines[linenum]
     for context in contexts:
         if '@' + context in task:
             print("Context @{} is already assigned".format(context))
@@ -171,63 +232,71 @@ def set_context(task, contexts):
                                      context, task[insert_before.start():])
         else:
             task = task[:-1] + ' @' + context + task[-1:]
-    return task
+    lines[linenum] = task
+    return lines
 
 
-def unset_context(task, num=1):
+def unset_context(lines, linenum, num=1):
+    num = int(num)
+    task = lines[linenum]
     contexts = [m for m in re.finditer('@\w+', task)]
     if num > len(contexts):
         print("Not that many contexts")
-        return task
-    start = contexts[num-1].start()
-    end = contexts[num-1].end()
-    return task[:start-1] + task[end:]
+    else:
+        start = contexts[num-1].start()
+        end = contexts[num-1].end()
+        task = task[:start-1] + task[end:]
+        lines[linenum] = task
+    return lines
 
 
-def get_projects():
+def get_projects(lines):
     projects = set([])
-    for line in file:
+    for line in lines:
         for p in re.findall('\+\w+', line):
             projects.add(p)
     return projects
 
 
-def print_projects():
-    projects = get_projects()
+def print_projects(lines):
+    projects = get_projects(lines)
     for project in projects:
         print(project.replace('+', ''))
 
 
-def set_project(task, project):
-    if '+' + project in task:
-        print("That project is already assigned")
-        return task
-    insert_before = re.search('@\w+|P:|C:|R:', task)
-    if insert_before:
-        return '{}+{} {}'.format(task[:insert_before.start()],
-                                 project, task[insert_before.start():])
-    else:
-        return task[:-1] + ' +' + project + task[-1:]
+def set_project(lines, linenum, *projects):
+    task = lines[linenum]
+    for project in projects:
+        if '+' + project in task:
+            print("That project is already assigned")
+            return lines
+        insert_before = re.search('@\w+|P:|C:|R:', task)
+        if insert_before:
+            lines[linenum] = '{}+{} {}'.format(
+                task[:insert_before.start()], project,
+                task[insert_before.start():])
+        else:
+            lines[linenum] = task[:-1] + ' +' + project + task[-1:]
+    return lines
 
 
-def unset_project(task, num=1):
+def unset_project(lines, linenum, num=1):
+    num = int(num)
+    task = lines[linenum]
     projects = [m for m in re.finditer('\+\w+', task)]
     if num > len(projects):
         print("Not that many projects")
-        return task
-    start = projects[num-1].start()
-    end = projects[num-1].end()
-    return task[:start-1] + task[end:]
+    else:
+        start = projects[num-1].start()
+        end = projects[num-1].end()
+        lines[linenum] = task[:start-1] + task[end:]
+    return lines
 
 
-def reorder():
+def reorder(lines):
     """Placeholder for complex reorder op"""
-    file.sort()
-
-
-def fetch_lines():
-    output_lines = ['%d %s' % (i, l) for i, l in enumerate(file)]
-    return output_lines
+    lines.sort()
+    return lines
 
 
 def view_including(lines, args):
@@ -253,21 +322,22 @@ def view_excluding(lines, args):
 def view_until(lines, date):
     date_int = int(date.replace('-', ''))
     output_lines = []
+    lines = [l for l in lines if ' x ' not in l[:10]]
     for line in lines:
         due = re.search('\d{4}-\d{2}-\d{2}', line)
         if due:
             due_int = int(due.group().replace('-', ''))
-            if due_int <= date_int:
+            if due_int < date_int:
                 output_lines.append(line)
     return output_lines
 
 
 def view_today(lines):
-    return view_until(lines, today_string)
+    return view_until(lines, add_days(today_string, 1))
 
 
 def view_this_week(lines):
-    return view_until(lines, add_days(today_string, 7))
+    return view_until(lines, add_days(today_string, 8))
 
 
 def view_by_project(lines):
@@ -412,9 +482,9 @@ def nest(lines):
         if parent_tag:
             latest_parent_id = parent_tag.group().replace('c', '')[2:]
             if 'c' not in parent_tag.group():
-                line = '\033[31m+\033[39m ' + line
+                line = '+ ' + line
             else:
-                line = '\033[31m-\033[39m ' + line
+                line = '- ' + line
                 closed_id = latest_parent_id
         # align non plus or minused tasks
         else:
@@ -450,23 +520,100 @@ def clean(lines):
     output_lines = []
     for line in lines:
         output_lines.append(re.sub(
-            '\d{4}-\d{2}-\d{2}\s|3\d{7}|P:\w|C:\w|R:\w', '', line))
+            '\d{4}-\d{2}-\d{2}\s|3\d{7}|P:\w+|C:\w+|R:\w+', '', line))
     return output_lines
 
 
-def unset_parent(task):
+def date_headers(lines):
+    i = 0
+    remaining = len(lines)
+    previous_date = ''
+    while i < remaining:
+        date = re.search('\d{4}-\d{2}-\d{2}', lines[i])
+        if date and date.group() != previous_date:
+            lines.insert(i, '   _{}_'.format(date.group()))
+            previous_date = date.group()
+            i += 1
+            remaining += 1
+        i += 1
+    return lines
+
+
+def get_console_size():
+    """returns rows and columns as 2 tuple"""
+    return [int(i) for i in os.popen('stty size', 'r').read().split()]
+
+
+def color(lines):
+    color_prefix = '\x1b[38;5;{}m'
+    color_unset = '\x1b[0m'
+    red = color_prefix.format(1)
+    green = color_prefix.format(2)
+    yellow = color_prefix.format(3)
+    blue = color_prefix.format(4)
+    # magenta = color_prefix.format(5)
+    # cyan = color_prefix.format(6)
+    # white = color_prefix.format(15)
+    orange = color_prefix.format(16)
+    gray = color_prefix.format(19)
+
+    background = '\x1b[48;5;18m'
+
+    for i in range(len(lines)):
+        task = lines[i]
+        if re.match('\s*\d+\sx\s', task):
+            task = '{}{}{}\n'.format(gray, task.rstrip(), color_unset)
+            lines[i] = task
+            continue
+        task = re.sub('^(\s*\+*\s*)(\d+)', '\g<1>{}\g<2>{}'.format(gray,
+                      color_unset), task)
+        task = re.sub('\([A-Z]\)', '{}\g<0>{}'.format(red, color_unset), task)
+        task = re.sub('\+\w+', '{}\g<0>{}'.format(blue, color_unset), task)
+
+        task = re.sub('^\s*\+', '{}\g<0>{}'.format(red, color_unset), task)
+        task = re.sub('@\w+', '{}\g<0>{}'.format(yellow, color_unset), task)
+        task = re.sub('(?:P:|C:|R:)\w+', '{}\g<0>{}'
+                      .format(gray, color_unset), task)
+
+        dates = [m for m in re.finditer('\d{4}-\d{2}-\d{2}\s{1}', task)]
+        j = len(dates) - 1
+        while j > -1:
+            if len(dates) > 1 and j == 0:
+                color = orange
+            else:
+                color = green
+            s = dates[j].start()
+            e = dates[j].end()
+            task = task[:s]+color+task[s:e]+color_unset+task[e:]
+            j -= 1
+
+        rows, columns = get_console_size()
+        pad = columns - len(task) + 1
+        task = re.sub('.*_(.*)_', '{}    {}\g<1>{}{}'.format(
+            background, gray, ' '*pad, color_unset), task)
+
+        lines[i] = task
+    return lines
+
+
+def unset_parent(lines, linenum):
     """takes task string argument, return string without parent tag"""
+    task = lines[linenum]
     tag = re.search('P:\d+', task)
-    start = tag.start()
-    end = tag.end()
-    return task[:start-1] + task[end:]
+    if tag:
+        start = tag.start()
+        end = tag.end()
+        lines[linenum] = task[:start-1] + task[end:]
+    return lines
 
 
-def set_parent(task):
+def set_parent(lines, linenum, return_id=False):
+    linenum = int(linenum)
+    task = lines[linenum]
     if 'P:' in task:
         print("Already set as parent")
     parent_ids = []
-    for line in file:
+    for line in lines:
         for c in re.findall('P:\d+', line):
             parent_ids.append(int(c[2:]))
     parent_id = 0
@@ -478,131 +625,150 @@ def set_parent(task):
             i += 1
     insert_before = re.search('R:', task)
     if insert_before:
-        return '{}P:{} {}'.format(task[:insert_before.start()],
-                                  parent_id, task[insert_before.start():])
+        lines[linenum] = '{}P:{} {}'.format(
+            task[:insert_before.start()], parent_id,
+            task[insert_before.start():])
     else:
-        return task[:-1] + ' P:' + str(parent_id) + task[-1:], parent_id
+        lines[linenum] = task[:-1] + ' P:' + str(parent_id) + task[-1:]
+    if return_id:
+        return lines, parent_id
+    else:
+        return lines
 
 
-def evaluate_parent(id):
+def evaluate_parent(lines, id):
     """check for children matching the parent id,
     if none then remove parent tag.
     """
     children = 0
-    for line in file:
+    for line in lines:
         if 'C:' + str(id) in line:
             children += 1
             # because func is called from child tag removal method before line
-            # written, there will be at least 1 child remaining in the file.
+            # written, there will be at least 1 child remaining in the lines.
             # that's why the loop returns on >1 instead of >0
             if children > 1:
                 return
-    for i, line in enumerate(file):
+    for i, line in enumerate(lines):
         if "P:" + str(id) in line:
-            task = unset_parent(line)
-            linenum = i
+            lines = unset_parent(lines, i)
             break
-    file[linenum] = task
+    return lines
 
 
-def unset_child(task):
+def unset_child(lines, linenum):
+    task = lines[linenum]
     tag = re.search('C:\w+', task)
-    start = tag.start()
-    end = tag.end()
-    id = task[start+2:end]
-    evaluate_parent(id)
-    return task[:start-1] + task[end:]
+    if tag:
+        start = tag.start()
+        end = tag.end()
+        id = task[start+2:end]
+        lines = evaluate_parent(lines, id)
+        lines[linenum] = task[:start-1] + task[end:]
+    return lines
 
 
-def set_child(task, parent_linenum):
+def set_child(lines, linenum, parent_linenum):
+
+    task = lines[linenum]
 
     # get parent line from linenum
-    parent = file[int(parent_linenum)]
+    parent = lines[int(parent_linenum)]
 
     # get if parent is already parent get id, else set as parent
     parent_tag = re.search('P:\d+', parent)
     if parent_tag:
         parent_id = parent[parent_tag.start()+2:parent_tag.end()]
     else:
-        file[int(parent_linenum)], parent_id = set_parent(parent)
+        lines, parent_id = set_parent(lines, parent_linenum, True)
 
     child_tag = 'C:' + str(parent_id)
     if child_tag in task:
-        return task
+        return lines
     if 'C:' in task:
-        task = unset_child(task)
+        task = unset_child(lines, linenum)
     insert_before = re.search('P:|C:', task)
     if insert_before:
-        return '{}{} {}'.format(task[:insert_before.start()],
-                                child_tag, task[insert_before.start():])
+        lines[linenum] = '{}{} {}'.format(
+            task[:insert_before.start()],
+            child_tag, task[insert_before.start():])
     else:
-        return task[:-1] + ' ' + child_tag + task[-1:]
+        lines[linenum] = task[:-1] + ' ' + child_tag + task[-1:]
+    return lines
 
 
-def contract(task):
+def contract(lines, linenum):
+    task = lines[linenum]
     parent_tag = re.search('P:\d+(?!c)', task)
     if parent_tag:
-        return task[:parent_tag.end()]+'c'+task[parent_tag.end():]
-    return task
+        lines[linenum] = task[:parent_tag.end()]+'c'+task[parent_tag.end():]
+    return lines
 
 
-def expand(task):
+def expand(lines, linenum):
+    task = lines[linenum]
     parent_tag = re.search('P:\d+c', task)
     if parent_tag:
-        return task[:parent_tag.end()-1]+task[parent_tag.end():]
+        lines[linenum] = task[:parent_tag.end()-1]+task[parent_tag.end():]
     else:
-        return task
+        lines[linenum] = task
+    return lines
 
 
-def future_unset(task):
+def future_unset(lines, linenum):
+    task = lines[linenum]
     future_num = re.search('3\d{7}\s', task)
     if future_num:
         start = future_num.start()
         end = future_num.end()
-        return task[:start] + task[end:]
-    else:
-        return task
+        lines[linenum] = task[:start] + task[end:]
+    return lines
 
 
-def future_find_last_num():
-    for i in range(len(file)-1, -1, -1):
-        last_future_num = re.search('3\d{7}\s', file[i])
+def future_find_last_num(lines):
+    for i in range(len(lines)-1, -1, -1):
+        last_future_num = re.search('3\d{7}\s', lines[i])
         if last_future_num:
             return int(last_future_num.group()[1:])
     return None
 
 
-def future_assign_num(task, num):
+def future_assign_num(lines, linenum, num):
+    task = lines[linenum]
     future_num = re.search('3\d{7}\s', task)
     if future_num:
-        task = future_unset(task)
+        task = future_unset(lines, linenum)[linenum]
     if task.startswith('('):  # insert behind priority if one is set
-        return '{}3{:0=7d} {}'.format(task[:4], num, task[4:])
+        lines[linenum] = '{}3{:0=7d} {}'.format(task[:4], num, task[4:])
     else:
-        return '3{:0=7d} {}'.format(num, task)
+        lines[linenum] = '3{:0=7d} {}'.format(num, task)
+    return lines
 
 
-def future_set(task):
-    if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}', task):
-        task = unschedule(task)
-    last_future_num = future_find_last_num()
+def future_set(lines, linenum):
+    if re.search('\d{4}-\d{1,2}-\d{1,2}\s\d{4}-\d{1,2}-\d{1,2}',
+                 lines[linenum]):
+        lines = unschedule(lines, linenum)
+    last_future_num = future_find_last_num(lines)
     if last_future_num:
         future_num = last_future_num + 10000
         if last_future_num < 9999999:
-            return future_assign_num(task, future_num)
+            lines = future_assign_num(lines, linenum, future_num)
     else:
-        return future_assign_num(task, 10000)
+        lines = future_assign_num(lines, linenum, 10000)
+    return lines
 
 
-def future_redistribute():
-    file.sort()
+def future_redistribute(lines):
+    lines.sort()
     last_num = 0
-    for i, line in enumerate(file):
+    for i, line in enumerate(lines):
         future_num = re.search('3\d{7}\s', line)
         if future_num:
             num = last_num + 10000
-            file[i] = future_assign_num(line, num)
+            lines = future_assign_num(lines, i, num)
             last_num = num
+    return lines
 
 
 def future_get_num(task):
@@ -613,17 +779,18 @@ def future_get_num(task):
         return None
 
 
-def future_order_after(moved_index, pivot_index):
+def future_order_after(lines, linenum, pivot_index):
     # get num of target (pivot) task
-    pivot_num = future_get_num(file[pivot_index])
+    pivot_index = int(pivot_index)
+    pivot_num = future_get_num(lines[pivot_index])
     if not pivot_num:
         print('pivot task not scheduled in fuzzy future')
         return
 
     # check if there is another line after pivot task
-    if pivot_index + 1 < len(file):
+    if pivot_index + 1 < len(lines):
         # if there is a line, check for future num.
-        adjacent_num = future_get_num(file[pivot_index+1])
+        adjacent_num = future_get_num(lines[pivot_index+1])
         # if there is a future num, make num half the difference with pivot
         if adjacent_num:
             half_diff = (adjacent_num - pivot_num) // 2
@@ -634,44 +801,52 @@ def future_order_after(moved_index, pivot_index):
     else:
         num = pivot_num + 10000
 
-    file[moved_index] = future_assign_num(file[moved_index], num)
+    lines = future_assign_num(lines, linenum, num)
 
     # redistribute if the gap between tasks becomes too small
     # in the rare event the num reaches > 9999999, redist
-    if adjacent_num - pivot_num < 4 or num > 9999999:
-        future_redistribute()
+    if num != pivot_num + 10000 or num > 9999999:
+        lines = future_redistribute(lines)
+    return lines
 
 
-def future_order_before(moved_index, pivot_index):
+def future_order_before(lines, linenum, pivot_index):
     # get num of target (pivot) task
-    pivot_num = future_get_num(file[pivot_index])
+    pivot_index = int(pivot_index)
+    pivot_num = future_get_num(lines[pivot_index])
     if not pivot_num:
-        print('pivot task not scheduled in fuzzy future')
-        return
+        print('task number {} has a due-date, and so can\'t be ordered against'
+              .format(pivot_index))
+        return lines
     adjacent_num = 0
     if pivot_index != 1:
-        adjacent_num = future_get_num(file[pivot_index-1])
+        adjacent_num = future_get_num(lines[pivot_index-1])
         if not adjacent_num:
             adjacent_num = 0
     half_diff = (pivot_num - adjacent_num) // 2
     num = pivot_num - half_diff
 
-    file[moved_index] = future_assign_num(file[moved_index], num)
+    lines = future_assign_num(lines, linenum, num)
 
     # redistribute if the gap between tasks becomes too small
     # in the rare event the num reaches > 9999999, redist
     if pivot_num - adjacent_num < 4:
-        future_redistribute()
+        future_redistribute(lines)
+    return lines
 
 
-def recur_unset(task):
+def recur_unset(lines, linenum):
+    task = lines[linenum]
     tag = re.search('R:\w+', task)
-    start = tag.start()
-    end = tag.end()
-    return task[:start-1] + task[end:]
+    if tag:
+        start = tag.start()
+        end = tag.end()
+        lines[linenum] = task[:start-1] + task[end:]
+    return lines
 
 
-def recur_set(task, days):
+def recur_set(lines, linenum, days):
+    task = lines[linenum]
     # makes recur tag
     if re.match('e\d{1,2}$|a\d{1,2}$', days):
         tag = 'R:' + days
@@ -697,14 +872,15 @@ def recur_set(task, days):
 
     # remove old recur tag
     if 'R:' in task:
-        task = recur_unset(task)
+        lines = recur_unset(lines, linenum)
 
     insert_before = re.search('P:|C:', task)
     if insert_before:
-        return '{}{} {}'.format(task[:insert_before.start()],
-                                tag, task[insert_before.start():])
+        lines[linenum] = '{}{} {}'.format(
+            task[:insert_before.start()], tag, task[insert_before.start():])
     else:
-        return task[:-1] + ' ' + tag + task[-1:]
+        lines[linenum] = task[:-1] + ' ' + tag + task[-1:]
+    return lines
 
 
 def add_days(date, num):
@@ -742,14 +918,16 @@ def strip_prefixes(task):
             start += 1
         else:
             break
-    return ' '.join(task[start:])
+    task = ' '.join(task)
+    return task
 
 
-def recur_recycle(task):
+def recur_recycle(lines, linenum):
+    task = lines[linenum]
 
-    # fix first run of e10, so doing it doesnt schedule 20 days later
-    # could add c0 to first run
-    # allow creation of e tasks on any day, correct to compensate
+    # append duplicate and do it
+    lines.append(task)
+    lines = mark_done(lines, len(lines)-1)
 
     tag = re.search('R:\w+', task)
     days = tag.group()[2:]
@@ -792,17 +970,16 @@ def recur_recycle(task):
             offset += 1
         due = add_days(today_string, offset)
 
-    removed = do(task)
-    fresh_task = strip_prefixes(task)
-    fresh_task = '{} {}'.format(today_string, fresh_task)
-    fresh_task = assign_duedate(fresh_task, due)
+    # now turn existing task into recurred version
+    task = strip_prefixes(task)
+    lines[linenum] = '{} {}'.format(today_string, task)
+    lines = assign_duedate(lines, linenum, due)
 
-    file.append(removed)
-    return fresh_task
+    return lines
 
 
 def write_changes(lines):
-    reorder()
+    lines = reorder(lines)
     with open(todolist, "w") as f:
         for line in lines:
             f.write(line)
@@ -817,37 +994,53 @@ view_commands = {
     'excl': (view_excluding, 1, 9),
     'today': (view_today, 0, 0),
     'week': (view_this_week, 0, 0),
-    'until': (view_until, 0, 0),
+    'until': (view_until, 1, 1),
     'nest': (nest, 0, 0),
     'clean': (clean, 0, 0),
+    'color': (color, 0, 0),
+    'h': (date_headers, 0, 0),
     }
 
+# mins and maxes here exclude lines and target linenum,
+# as they never factor into comparisons
 action_commands = {
-    'a': (add, 1, 100),
-    'rm': (remove_task, 1, 1),
-    'do': (do, 1, 1),
-    'undo': (undo, 1, 1),
-    's': (schedule, 2, 2),
-    'us': (unschedule, 1, 1),
-    'p': (prioritize, 2, 2),
-    'up': (unprioritize, 1, 1),
-    'c': (set_context, 2, 9),
+    'a': (add, 1, 100),  # except 'a', which has numbers for show atm
+    'ed': (edit, 0, 0),
+    'rm': (remove_task, 0, 0),
+    'do': (do, 0, 0),
+    'undo': (undo, 0, 0),
+    's': (schedule, 1, 1),
+    'us': (unschedule, 0, 0),
+    'p': (prioritize, 1, 1),
+    'up': (unprioritize, 0, 0),
+    'c': (set_context, 1, 9),
     'uc': (unset_context, 1, 1),
-    'pr': (set_project, 2, 2),
+    'pr': (set_project, 1, 9),
     'upr': (unset_project, 1, 1),
-    'sub': (set_child, 2, 2),
-    'usub': (unset_child, 1, 1),
-    'cn': (contract, 1, 1),
-    'ex': (expand, 1, 1),
-    'f': (future_set, 1, 1),
-    'mb': (future_order_before, 2, 2),
-    'ma': (future_order_after, 2, 2),
-    're': (recur_set, 2, 2),
-    'ure': (recur_unset, 1, 1),
+    'sub': (set_child, 1, 1),
+    'usub': (unset_child, 0, 0),
+    'cn': (contract, 0, 0),
+    'ex': (expand, 0, 0),
+    'f': (future_set, 0, 0),
+    'mb': (future_order_before, 1, 1),
+    'ma': (future_order_after, 1, 1),
+    're': (recur_set, 1, 1),
+    'ure': (recur_unset, 0, 0),
+    }
+
+
+general_commands = {
+    'catch': catch,
     }
 
 
 def assemble_view_command_list(args):
+    """
+    Given a list of args, scan for names corresponding to functions,
+    return a list of tuples, where the first item is a found command name
+    the second is a list of the arguments the followed.
+    tuples containing 'nest' or 'clean' commands are moved to end of list.
+    """
     command_list = []
     for arg in args:
         if arg in view_commands.keys():
@@ -865,25 +1058,11 @@ def assemble_view_command_list(args):
         if command_list[i][0] == 'clean':
             command_list.append(command_list.pop(i))
         i += 1
-
-    return command_list
-
-
-def assemble_action_command_list(args):
-    task_text = False
-    for arg in args:
-        if task_text == False:
-            if arg in view_commands.keys():
-                command_args = (arg, [])
-                command_list.append(command_args)
-                task_text = arg == 'a'
-            else:
-                command_list[-1][1].append(arg)
-        else:
-            if arg == ',':
-                task_text = False
-            else:
-                command_list[-1][1].append(arg)
+    i = 0
+    while i < len(command_list):
+        if command_list[i][0] == 'color':
+            command_list.append(command_list.pop(i))
+        i += 1
 
     return command_list
 
@@ -918,38 +1097,206 @@ def verify_view_command_list(command_list):
 
 
 def execute_view_command_list(command_list):
-    lines = fetch_lines()
+    # number lines differently depending on display type
+    commands = [c for c, a in command_list]
+    if 'nest' in commands:
+        lines = ["{} {}".format(i, t) for i, t in enumerate(file)]
+    else:
+        lines = ["{:>3} {}".format(i, t) for i, t in enumerate(file)]
+
     for command_args in command_list:
         command, args = command_args
         if not args:
             lines = view_commands[command][0](lines)
         else:
-            lines = view_commands[command][0](lines, args)
+            lines = view_commands[command][0](lines, *args)
     for line in lines:
         print(line.rstrip())
 
-def execute_action_command_list(command_list):
-    lines = fetch_lines()
+
+def handle_view_commands(args):
+    command_list = assemble_view_command_list(args)
+    if verify_view_command_list(command_list):
+        execute_view_command_list(command_list)
+
+
+def get_action_target(args):
+    target = None
+    if args[0].isdigit():
+        target = int(args[0])
+        args = args[1:]
+    return args, target
+
+
+def extract_task_addition(command_list):
+    addition = None
+    i = 0
+    remaining = len(command_list)
+    while i < remaining:
+        command, args = command_list[i]
+        if command == 'a':
+            addition = ' '.join(args)
+            command_list.pop(i)
+            break
+        i += 1
+    return command_list, addition
+
+
+def assemble_action_command_list(args):
+    command_list = []
+    task_text = False
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if task_text is False:
+            if arg in action_commands.keys():
+                command_args = (arg, [])
+                command_list.append(command_args)
+                # set to grab task text if command is a
+                task_text = arg == 'a'
+                # manually grab args for some commands because they're
+                # also sometimes commands
+                if arg in ['s', 'p']:
+                    i += 1
+                    if args[i].isdigit():
+                        command_list[-1][1].append(args[i])
+                        i += 1
+                    if args[i] in ['a', 'f', 's', 'c']:
+                        command_list[-1][1].append(args[i])
+                    else:
+                        i -= 1
+            else:
+                command_list[-1][1].append(arg)
+        else:
+            if arg == ',':
+                task_text = False
+            else:
+                command_list[-1][1].append(arg)
+        i += 1
+    return command_list
+
+
+def prepare_single_action(command_list):
+    target = None
+    if len(command_list) > 1:
+        print("Error: may not combine multiple commands without specifying"
+              " a target as the very first argument or unless a task is being"
+              " added")
+    elif len(command_list[0][1]) < 1 or not command_list[0][1][0].isdigit():
+        print("Error: command requires a target")
+    else:
+        target = int(command_list[0][1][0])
+        command_list[0][1].pop(0)
+    return command_list, target
+
+
+def verify_action_command_list(command_list):
+    for command_args in command_list:
+        command, args = command_args
+        min = action_commands[command][1]
+        max = action_commands[command][2]
+        if len(args) < min:
+            if min != max:
+                print("Error: '{}' takes at least {} argument{plural} "
+                      "in addition to the target".format(
+                          command, min, plural='' if min == 1 else 's'))
+            else:
+                print("Error: '{}' takes {} argument{plural} "
+                      "in addition to the target".format(
+                          command, min, plural='' if min == 1 else 's'))
+            return False
+        elif len(args) > max:
+            surplus = args[max]
+            if min != max:
+                print("Error: '{}' takes at most {} argument{plural} "
+                      "in addition to the target, and '{}' is not a "
+                      "command".format(
+                          command, max, surplus,
+                          plural='' if max == 1 else 's'))
+            else:
+                print("Error: '{}' takes {} argument{plural} "
+                      "in addition to the target, and '{}' is not a "
+                      "command".format(
+                          command, max, surplus,
+                          plural='' if max == 1 else 's'))
+            return False
+    return True
+
+
+def execute_action_command_list(command_list, target, lines):
     for command_args in command_list:
         command, args = command_args
         if not args:
-            lines = view_commands[command][0](lines)
+            lines = action_commands[command][0](lines, target)
         else:
-            lines = view_commands[command][0](lines, args)
-    for line in lines:
-        print(line.rstrip())
+            lines = action_commands[command][0](lines, target, *args)
+    return lines
+
+
+def handle_action_commands(args):
+    lines = file[:]
+
+    # if first arg is an int, extract it as target
+    args, target = get_action_target(args)
+
+    # make command list out of args
+    command_list = assemble_action_command_list(args)
+
+    # get addition from command list if exists else none
+    command_list, addition = extract_task_addition(command_list)
+
+    # if there's an addition, fail if also target, else add addition
+    # and make it the target
+    if addition is not None:
+        if target:
+            print("Error: can't specify a target task and add"
+                  " a task at the same time")
+            return
+        elif addition == '':
+            print("Error: new task must contain text")
+            return
+        else:
+            lines = add(lines, addition)
+            target = len(lines) - 1
+
+    # if there's no initial integer or added task, it must be
+    # a single command with target as first arg. check for validity
+    # and process
+    if not target:
+        command_list, target = prepare_single_action(command_list)
+
+    # return if target None or if int out of range
+    if target is None:
+        print("Error: No target specified")
+        return
+    elif target >= len(lines):
+        print("Error: task number supplied is {}, but only"
+              " {} tasks in list".format(target, len(lines)))
+        return
+
+    if verify_action_command_list(command_list):
+        lines = execute_action_command_list(command_list, target, lines)
+
+    write_changes(lines)
+
+
+def handle_general_commands(arg):
+    lines = file[:]
+    lines = general_commands[arg](lines)
+    write_changes(lines)
+
 
 def main(args):
-    if args[0] in view_commands.keys():
-        command_list = assemble_view_command_list(args)
-        if not verify_view_command_list(command_list):
-            return
-        execute_view_command_list(command_list)
-    elif args[0] in action_commands.keys():
-        command_list = assemble_action_command_list(args)
-        execute_action_command_list(command_list)
-    else:
+    if len(args) == 0:
         pass
+    elif args[0] in view_commands.keys():
+        handle_view_commands(args)
+    elif args[0] in action_commands.keys() or args[0].isdigit():
+        handle_action_commands(args)
+    elif args[0] in general_commands.keys():
+        handle_general_commands(args[0])
+    else:
+        print('Error: {} is not a valid command'.format(args[0]))
 
 
 if __name__ == "__main__":  # why do I use this

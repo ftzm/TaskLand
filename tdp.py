@@ -1012,9 +1012,9 @@ view_commands = {
     'today': (view_today, 0, 0),
     'week': (view_this_week, 0, 0),
     'until': (view_until, 1, 1),
-    'nest': (nest, 0, 0),
     'clean': (clean, 0, 0),
     'color': (color, 0, 0),
+    'nest': (nest, 0, 0),
     'h': (date_headers, 0, 0),
     }
 

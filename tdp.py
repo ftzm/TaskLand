@@ -802,7 +802,7 @@ def future_order_after(lines, linenum, pivot_index):
     pivot_num = future_get_num(lines[pivot_index])
     if not pivot_num:
         print('pivot task not scheduled in fuzzy future')
-        return
+        return lines
 
     # check if there is another line after pivot task
     if pivot_index + 1 < len(lines):
@@ -1012,9 +1012,9 @@ view_commands = {
     'today': (view_today, 0, 0),
     'week': (view_this_week, 0, 0),
     'until': (view_until, 1, 1),
+    'nest': (nest, 0, 0),
     'clean': (clean, 0, 0),
     'color': (color, 0, 0),
-    'nest': (nest, 0, 0),
     'h': (date_headers, 0, 0),
     }
 

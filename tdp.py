@@ -6,6 +6,7 @@ import datetime
 import collections
 import readline
 import copy
+import base62
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -21,11 +22,12 @@ x_re = re.compile('^(x)')
 pri_re = re.compile('^(\([A-Z]\))')
 p_re = re.compile('\+(\w+)')
 c_re = re.compile('@(\w+)')
+a_re = re.compile('A:(\d{4}-\d{2}-\d{2})')
 p_id_re = re.compile('P:(\w+)')
-c_id_re = re.compile('C:(\w+)')
+c_id_re = re.compile('C:(\d+)')
 r_id_re = re.compile('R:(\w+)')
+o_re = re.compile('O:(\w+)')
 date_re = re.compile('(\d{4}-\d{2}-\d{2})')
-f_re = re.compile('3(\d{7})')
 
 weekdays = ['m', 't', 'w', 'r', 'f', 's', 'u']
 
@@ -55,12 +57,18 @@ def extract_all(line, reg):
 
 
 class Task(object):
-    def __init__(self, line, num=0):
-        self.num = num
+    def __init__(self, line):
+        self.num = None
         line, self.x = extract(line, x_re)
         line, self.priority = extract(line, pri_re)
-        line, self.future = extract(line, f_re)
+        line, self.added = extract(line, a_re)
         line, dates = extract_all(line, date_re)
+        line, self.order = extract(line, o_re)
+        if self.order is not None:
+            try:
+                self.order = base62.decode(self.order)
+            except:
+                print('Error: corrupted order code')
         line, self.contexts = extract_all(line, c_re)
         line, self.projects = extract_all(line, p_re)
         line, self.parent_id = extract(line, p_id_re)
@@ -73,25 +81,23 @@ class Task(object):
         line, self.repeat = extract(line, r_id_re)
         self.text = line.strip()
 
+        if self.added is not None:
+            self.added = datetime.date(*map(int, self.added.split('-')))
+
         dates = [datetime.date(*map(int, d.split('-'))) for d in dates]
         datenum = len(dates)
-        if datenum == 3:
-            self.done, self.due, self.created = dates
-        elif datenum == 2 and self.x:
-            self.done, self.due, self.created = dates[0], None, dates[1]
-        elif datenum == 2:
-            self.done, self.due, self.created = None, dates[0], dates[1]
+        if datenum == 2:
+            self.done, self.due = dates[0], dates[1]
+        elif datenum == 1 and self.x is not None:
+            self.done, self.due = dates[0], None
         elif datenum == 1:
-            self.done, self.due, self.created = None, None, dates[0]
+            self.done, self.due = None, dates[0]
         else:
-            self.done, self.due, self.created = None, None, None
+            self.done, self.due = None, None
 
-        self.sort_field = self.done or self.due or self.created or \
-            datetime.date(1, 1, 1)
-
-    def compose_parts(self, exclusions=None):
-        parts = ['n', 'x', 'p', 'f', 'dn', 'd', 'c', 't', 'pr', 'cn',
-                 'r', 'p_id', 'c_id']
+    def compose_parts(self, order, exclusions=None):
+        parts = ['n', 'x', 'p', 'dn', 'd', 't', 'pr', 'cn',
+                 'r', 'a', 'o', 'p_id', 'c_id']
 
         if exclusions is not None:
             parts = [p for p in parts if p not in exclusions]
@@ -100,10 +106,10 @@ class Task(object):
             'n': '{:>3}'.format(self.num),
             'x': self.x,
             'p': self.priority,
-            'f': '3{:0=7d}'.format(int(self.future)) if self.future else None,
             'dn': self.done.strftime('%Y-%m-%d') if self.done else None,
             'd': self.due.strftime('%Y-%m-%d') if self.due else None,
-            'c': self.created.strftime('%Y-%m-%d') if self.created else None,
+            'a': self.added.strftime('A:%Y-%m-%d') if self.added else None,
+            'o': 'O:{}'.format(base62.encode(order)),
             'pr': ' '.join(['+{}'.format(p) for p in self.projects])
                  if self.projects else None,
             'cn': ' '.join(['@{}'.format(c) for c in self.contexts])
@@ -140,7 +146,8 @@ class Task(object):
             'f': cyan,
             'dn': gray,
             'd': orange,
-            'c': green,
+            'a': green,
+            'o': gray,
             'pr': blue,
             'cn': yellow,
             'p_id': gray,
@@ -156,8 +163,10 @@ class Task(object):
 
         return output
 
-    def compose_line(self, color=False, exclusions=None):
-        parts = self.compose_parts(exclusions)
+    def compose_line(self, color=False, exclusions=None, order=None):
+        if not order:
+            order = self.num
+        parts = self.compose_parts(order, exclusions)
         if color:
             parts = self.colorize_parts(parts)
         line = ' '.join([p[1] for p in parts if p[1] is not None])
@@ -270,8 +279,7 @@ def filter_exclude(tasks, *strings):
 
 def view_until(tasks, date):
     """takes datetime object, returns all tasks up to and including date"""
-    return [t for t in tasks if t.sort_field <= date and not t.future
-            and not t.x]
+    return [t for t in tasks if t.due and t.due <= date and not t.x]
 
 
 def view_until_cli(tasks, s):
@@ -391,17 +399,14 @@ def get_console_size():
 def date_headers(tasks, color, trimmings):
     previous_title = ''
     for t in tasks:
-        date = t.sort_field.strftime('%Y-%m-%d')
-        if date == '1-01-01':
-            title = 'No Date'
         if t.priority is not None:
             title = 'Prioritized'
         elif t.x is not None:
             title = 'Finished'
-        elif t.future is not None:
-            title = 'Undefined Future'
+        elif t.due:
+            title = t.due.strftime('%Y-%m-%d')
         else:
-            title = date
+            title = 'Future'
         if title != previous_title:
             previous_title = title
             buff = get_console_size()[1] - len(title)
@@ -419,6 +424,7 @@ def date_headers(tasks, color, trimmings):
 def add(tasks, s):
     task = Task(s)
     task.created = datetime.date.today()
+    task.due = datetime.date.today()
     tasks.append(task)
     return tasks
 
@@ -580,38 +586,30 @@ def future_redistribute(tasks):
 
 def future_set(tasks, n):
     tasks[n].due = None
-    tasks[n].future = future_find_last_num(tasks) + 10000
-    if tasks[n].future > 9999999:
-        future_redistribute(tasks)
     return tasks
 
 
-def future_order_after(tasks, n, p):
-    pivot_i = int(p) - 1
-    pivot_num = int(tasks[pivot_i].future)
-    if not pivot_num:
-        print('Error: pivot task not scheduled in undefined future')
-    elif pivot_num + 1 < len(tasks) and tasks[pivot_i+1].future is not None:
-        num = pivot_num + ((tasks[pivot_i+1].future - pivot_num) // 2)
-    else:
-        num = pivot_num + 10000
-    tasks[n].future = num
-    if tasks[n].future > 9999999:
-        future_redistribute(tasks)
-    return tasks
-
-
-def future_order_before(tasks, n, p):
+def order_after(tasks, n, p):
     pivot_i = int(p)-1
-    pivot_num = int(tasks[pivot_i].future)
-    adjacent_num = 0
-    if not pivot_num:
-        print('Error: pivot task not scheduled in undefined future')
-    elif pivot_i != 1 and tasks[pivot_i-1].future is not None:
-        adjacent_num = int(tasks[pivot_i-1].future)
-    tasks[n].future = pivot_num - ((pivot_num - adjacent_num) // 2)
-    if tasks[n].future - adjacent_num < 4:
-        future_redistribute(tasks)
+    if tasks[n].due != tasks[pivot_i].due:
+        print('Can\'t order tasks with different due dates against each other')
+        return tasks
+    if pivot_i > n:
+        pivot_i -= 1
+    moved = tasks.pop(n)
+    tasks.insert(pivot_i+1, moved)
+    return tasks
+
+
+def order_before(tasks, n, p):
+    pivot_i = int(p)-1
+    if tasks[n].due != tasks[pivot_i].due:
+        print('Can\'t order tasks with different due dates against each other')
+        return tasks
+    if pivot_i > n:
+        pivot_i -= 1
+    moved = tasks.pop(n)
+    tasks.insert(pivot_i, moved)
     return tasks
 
 
@@ -694,9 +692,29 @@ def catch(tasks):
     return tasks
 
 
+def collect_tasks():
+    tasks = [Task(l) for l in sorted(file)]
+    bins = []
+    bin = []
+    prev = None
+    for t in tasks:
+        if t.due == prev:
+            bin.append(t)
+        else:
+            prev = t.due
+            bins.append(sorted(bin, key=lambda x: x.order if x.order
+                        else 9**9))
+            bin = [t]
+    bins.append(sorted(bin, key=lambda x: x.order if x.order
+                else 9**9))
+    tasks = [t for b in bins for t in b]
+    for i, t in enumerate(tasks):
+        t.num = i+1
+    return tasks
+
+
 def write_tasks(tasks):
-    lines = [t.compose_line(False, 'n') for t in tasks]
-    lines.sort()
+    lines = [t.compose_line(False, ['n'], i+1) for i, t in enumerate(tasks)]
     with open(todolist, "w") as f:
         for line in lines:
             f.write(line + '\n')
@@ -738,8 +756,8 @@ action_commands = [
     ('cn', (contract, 0, 0)),
     ('ex', (expand, 0, 0)),
     ('f', (future_set, 0, 0)),
-    ('mb', (future_order_before, 1, 1)),
-    ('ma', (future_order_after, 1, 1)),
+    ('mb', (order_before, 1, 1)),
+    ('ma', (order_after, 1, 1)),
     ('re', (repeat_set, 1, 1)),
     ('ure', (repeat_unset, 0, 0)),
     ]
@@ -813,7 +831,7 @@ def execute_view_command_list(command_list):
         else:
             i += 1
 
-    tasks = [Task(l, i+1) for i, l in enumerate(file)]
+    tasks = collect_tasks()
 
     for command_args in command_list:
         command, args = command_args
@@ -957,7 +975,7 @@ def extract_task_addition(command_list):
 
 
 def handle_action_commands(args):
-    tasks = [Task(l, i+1) for i, l in enumerate(file)]
+    tasks = collect_tasks()
 
     # if first arg is an int, extract it as target
     args, target = get_action_target(args)
@@ -998,7 +1016,7 @@ def handle_action_commands(args):
 
 
 def handle_general_commands(arg):
-    tasks = [Task(l, i+1) for i, l in enumerate(file)]
+    tasks = collect_tasks()
     tasks = general_commands[arg](tasks)
     write_tasks(tasks)
 

@@ -11,18 +11,24 @@ import base62
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
+todolist = None
+default_command = None
+
 with open(os.path.join(__location__, "config.rc"), "r") as f:
-    todolist = f.readlines()[0].strip()
+    for line in f.readlines():
+        if line.startswith('list-location='):
+            todolist = line[len('list-location='):-1]
+        if line.startswith('default-command='):
+            default_command = line[len('default-command='):-1]
 
 with open(todolist, "r") as f:
     file = f.readlines()
-
 
 x_re = re.compile('^(x)')
 pri_re = re.compile('^(\([A-Z]\))')
 p_re = re.compile('\+(\w+)')
 c_re = re.compile('@(\w+)')
-a_re = re.compile('A:(\d{4}-\d{2}-\d{2})')
+a_re = re.compile('A:([\d\-]+)')
 p_id_re = re.compile('P:(\w+)')
 c_id_re = re.compile('C:(\d+)')
 r_id_re = re.compile('R:(\w+)')
@@ -58,7 +64,7 @@ def extract_all(line, reg):
 
 class Task(object):
     def __init__(self, line):
-        self.num = None
+        self.num = 0
         line, self.x = extract(line, x_re)
         line, self.priority = extract(line, pri_re)
         line, self.added = extract(line, a_re)
@@ -423,7 +429,7 @@ def date_headers(tasks, color, trimmings):
 
 def add(tasks, s):
     task = Task(s)
-    task.created = datetime.date.today()
+    task.added = datetime.date.today()
     task.due = datetime.date.today()
     tasks.append(task)
     return tasks
@@ -620,14 +626,14 @@ def repeat_unset(tasks, n):
 
 def repeat_set(tasks, n, s):
     t = tasks[n]
-    if t.created is None:
-        t.created = datetime.date.today()
+    if t.added is None:
+        t.added = datetime.date.today()
     if re.match('a\d{1,2}$', s):
         t.repeat = s
     elif re.match('e\d{1,2}$', s):
         t.repeat = s
-        if t.created is not None and t.due is not None:
-            t.repeat = t.repeat + 'c' + str((t.due - t.created).days)
+        if t.added is not None and t.due is not None:
+            t.repeat = t.repeat + 'c' + str((t.due - t.added).days)
         else:
             t.repeat += 'c0'
     elif re.match('[mtwrfsu]{1,7}', s):
@@ -647,13 +653,13 @@ def repeat_recycle(tasks, n):
     tasks.append(t_done)
 
     if 'a' in t.repeat:
-        interval = t.repeat[1:]
+        interval = int(t.repeat[1:])
         t.due += datetime.timedelta(interval)
     elif 'e' in t.repeat:
         nums = t.repeat[1:].split('c')
         interval = int(nums[0])
         # date it should have been done on ([-1] to use correction if there)
-        intended_date = t.created + datetime.timedelta(int(nums[-1]))
+        intended_date = t.added + datetime.timedelta(int(nums[-1]))
         t.due = intended_date + datetime.timedelta(interval)
         while t.due < td:
             t.due += datetime.timedelta(interval)
@@ -674,7 +680,7 @@ def repeat_recycle(tasks, n):
         t.due = td + datetime.timedelta(interval)
 
     # now turn existing task into recurred version
-    t.created = td
+    t.added = td
     t.priority = None
     return tasks
 
@@ -920,6 +926,7 @@ def verify_action_command_list(command_list):
                       "in addition to the target".format(
                           command, min, plural='' if min == 1 else 's'))
             else:
+                print(command_list)
                 print("Error: '{}' takes {} argument{plural} "
                       "in addition to the target".format(
                           command, min, plural='' if min == 1 else 's'))
@@ -998,7 +1005,7 @@ def handle_action_commands(args):
             tasks = add(tasks, addition)
             target = len(tasks) - 1
 
-    if not target:
+    if target is None:
         command_list, target = prepare_single_action(command_list)
 
     # return if target None or if int out of range
@@ -1023,8 +1030,8 @@ def handle_general_commands(arg):
 
 def main(args):
     if len(args) == 0:
-        pass
-    elif args[0] in view_commands.keys():
+        args = default_command.split(' ')
+    if args[0] in view_commands.keys():
         handle_view_commands(args)
     elif args[0] in action_commands.keys() or args[0].isdigit():
         handle_action_commands(args)

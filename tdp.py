@@ -169,7 +169,7 @@ class Task(object):
 
         return output
 
-    def compose_line(self, color=False, exclusions=None, order=None):
+    def compose_line(self, color=True, exclusions=None, order=None):
         if not order:
             order = self.num
         parts = self.compose_parts(order, exclusions)
@@ -516,7 +516,7 @@ def set_projects(tasks, n, projects):
 
 
 def unset_projects(tasks, n, i=1):
-    tasks[n].projects.pop(i-1)
+    tasks[n].projects.pop(int(i)-1)
     return tasks
 
 
@@ -654,7 +654,7 @@ def repeat_recycle(tasks, n):
 
     if 'a' in t.repeat:
         interval = int(t.repeat[1:])
-        t.due += datetime.timedelta(interval)
+        t.due = datetime.date.today() + datetime.timedelta(interval)
     elif 'e' in t.repeat:
         nums = t.repeat[1:].split('c')
         interval = int(nums[0])
@@ -728,17 +728,17 @@ def write_tasks(tasks):
 
 view_commands = [
     ('bc', (view_by_context, 0, 0)),
-    ('bpr', (view_by_project, 0, 0)),
+    ('bp', (view_by_project, 0, 0)),
     ('vc', (filter_contexts, 1, 9)),
-    ('vpr', (filter_projects, 1, 9)),
-    ('incl', (filter_include_all, 1, 9)),
-    ('incl', (filter_include_any, 1, 9)),
+    ('vp', (filter_projects, 1, 9)),
+    ('any', (filter_include_all, 1, 9)),
+    ('all', (filter_include_any, 1, 9)),
     ('excl', (filter_exclude, 1, 9)),
     ('today', (view_today, 0, 0)),
     ('week', (view_week, 0, 0)),
     ('until', (view_until, 1, 1)),
     ('trim', ('trim', 1, 9)),
-    ('color', ('color', 0, 0)),
+    ('nocolor', ('nocolor', 0, 0)),
     ('nest', (nest, 0, 0)),
     ('h', (date_headers, 0, 0)),
     ]
@@ -751,19 +751,19 @@ action_commands = [
     ('undo', (undo, 0, 0)),
     ('s', (schedule, 1, 1)),
     ('us', (unschedule, 0, 0)),
-    ('p', (prioritize, 1, 1)),
-    ('up', (unprioritize, 0, 0)),
+    ('pr', (prioritize, 1, 1)),
+    ('upr', (unprioritize, 0, 0)),
     ('c', (set_contexts, 1, 9)),
     ('uc', (unset_contexts, 1, 1)),
-    ('pr', (set_projects, 1, 9)),
-    ('upr', (unset_projects, 1, 1)),
+    ('p', (set_projects, 1, 9)),
+    ('up', (unset_projects, 1, 1)),
     ('sub', (child_set, 1, 1)),
     ('usub', (child_unset, 0, 0)),
     ('cn', (contract, 0, 0)),
     ('ex', (expand, 0, 0)),
     ('f', (future_set, 0, 0)),
-    ('mb', (order_before, 1, 1)),
-    ('ma', (order_after, 1, 1)),
+    ('sb', (order_before, 1, 1)),
+    ('sa', (order_after, 1, 1)),
     ('re', (repeat_set, 1, 1)),
     ('ure', (repeat_unset, 0, 0)),
     ]
@@ -818,7 +818,7 @@ def verify_view_command_list(command_list):
 def execute_view_command_list(command_list):
     # establish print method
     print_command = normal_print
-    color = False
+    color = True
     trimmings = []
     i = 0
     x = len(command_list)
@@ -827,9 +827,9 @@ def execute_view_command_list(command_list):
             # print_command = view_commands[command_list.pop(i)[0]]
             print_command = view_commands[command_list.pop(i)[0]][0]
             x -= 1
-        elif command_list[i][0] == 'color':
+        elif command_list[i][0] == 'nocolor':
             command_list.pop(i)
-            color = True
+            color = False
             x -= 1
         elif command_list[i][0] == 'trim':
             trimmings = command_list.pop(i)[1]

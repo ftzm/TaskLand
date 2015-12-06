@@ -102,8 +102,8 @@ class Task(object):
             self.done, self.due = None, None
 
     def compose_parts(self, order, exclusions=None):
-        parts = ['n', 'x', 'p', 'dn', 'd', 't', 'pr', 'cn',
-                 'r', 'a', 'o', 'p_id', 'c_id']
+        parts = ['n', 'x', 'pr', 'dn', 'd', 't', 'p', 'c',
+                 'a', 'r', 'o', 'p_id', 'c_id']
 
         if exclusions is not None:
             parts = [p for p in parts if p not in exclusions]
@@ -111,14 +111,14 @@ class Task(object):
         conversions = {
             'n': '{:>3}'.format(self.num),
             'x': self.x,
-            'p': self.priority,
+            'pr': self.priority,
             'dn': self.done.strftime('%Y-%m-%d') if self.done else None,
             'd': self.due.strftime('%Y-%m-%d') if self.due else None,
             'a': self.added.strftime('A:%Y-%m-%d') if self.added else None,
             'o': 'O:{}'.format(base62.encode(order)),
-            'pr': ' '.join(['+{}'.format(p) for p in self.projects])
+            'p': ' '.join(['+{}'.format(p) for p in self.projects])
                  if self.projects else None,
-            'cn': ' '.join(['@{}'.format(c) for c in self.contexts])
+            'c': ' '.join(['@{}'.format(c) for c in self.contexts])
                  if self.contexts else None,
             'p_id': ''.join(['P:', self.parent_id, 'c' if self.contracted
                              else '']) if self.parent_id else None,
@@ -148,14 +148,14 @@ class Task(object):
         pc = {
             'n': gray,
             'x': gray,
-            'p': red,
+            'pr': red,
             'f': cyan,
             'dn': gray,
             'd': orange,
             'a': green,
             'o': gray,
-            'pr': blue,
-            'cn': yellow,
+            'p': blue,
+            'c': yellow,
             'p_id': gray,
             'c_id': gray,
             'r': magenta,
@@ -687,8 +687,8 @@ def repeat_recycle(tasks, n):
 
 def catch(tasks):
     for i, t in enumerate(tasks):
-        if t.sort_field < datetime.date.today() and \
-                t.x is None and t.future is None:
+        if t.due < datetime.date.today() and \
+                t.x is None and t.due is not None:
             sched = input('{}\nNew due date (blank for future): '.format(
                 t.text))
             if sched == '':
@@ -696,6 +696,16 @@ def catch(tasks):
             else:
                 t.due = code_to_datetime(sched)
     return tasks
+
+
+def print_projects():
+    tasks = collect_tasks()
+    print('\n'.join(projects_get(tasks)))
+
+
+def print_contexts():
+    tasks = collect_tasks()
+    print('\n'.join(contexts_get(tasks)))
 
 
 def collect_tasks():
@@ -1037,6 +1047,10 @@ def main(args):
         handle_action_commands(args)
     elif args[0] in general_commands.keys():
         handle_general_commands(args[0])
+    elif args[0] == 'pp':
+        print_projects()
+    elif args[0] == 'pc':
+        print_contexts()
     else:
         print('Error: {} is not a valid command'.format(args[0]))
 

@@ -12,7 +12,7 @@ view_cmds=(
     'week:View tasks due up to and including a week from today'
     'until:View tasks due up to and including a given date'
     "trim:Don't show components of tasks signified by the following codes"
-    'color:Pretty-print tasks with color-coded components'
+    'nocolor:Pretty-print tasks with color-coded components'
     'nest:Pretty-print tasks with sub-task ordering'
     'h:Print a header above each group of dates'
     )
@@ -111,7 +111,6 @@ if [ ${#words[@]} -gt 2 ] && [ "$isdigit" = true ]; then
     keyword="$words[-3]"
 else
     keyword="$words[-2]"
-    print $keyword
 fi
 case "$keyword" in
     tdp)

@@ -241,6 +241,8 @@ def date_to_datetime(s):
 def code_to_datetime(s):
     if s[0] in weekdays:
         date = weekday_to_datetime(s)
+    elif s[0] == 'n':
+        date = datetime.date.today()
     elif s[0].isdigit():
         date = date_to_datetime(s)
     else:
@@ -746,7 +748,7 @@ view_commands = [
     ('excl', (filter_exclude, 1, 9)),
     ('today', (view_today, 0, 0)),
     ('week', (view_week, 0, 0)),
-    ('until', (view_until, 1, 1)),
+    ('until', (view_until_cli, 1, 1)),
     ('trim', ('trim', 1, 9)),
     ('nocolor', ('nocolor', 0, 0)),
     ('nest', (nest, 0, 0)),

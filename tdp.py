@@ -103,7 +103,7 @@ class Task(object):
 
     def compose_parts(self, order, exclusions=None):
         parts = ['n', 'x', 'pr', 'dn', 'd', 't', 'p', 'c',
-                 'a', 'r', 'o', 'p_id', 'c_id']
+                 'r', 'a', 'o', 'p_id', 'c_id']
 
         if exclusions is not None:
             parts = [p for p in parts if p not in exclusions]
@@ -138,11 +138,11 @@ class Task(object):
         green = color_prefix.format(2)
         yellow = color_prefix.format(3)
         blue = color_prefix.format(4)
-        magenta = color_prefix.format(5)
+        magenta = color_prefix.format(13)
         cyan = color_prefix.format(6)
-        orange = color_prefix.format(16)
-        gray = color_prefix.format(19)
-        white = color_prefix.format(7)
+        orange = color_prefix.format(9)
+        gray = color_prefix.format(10)
+        white = color_prefix.format(14)
         # background = '\x1b[48;5;18m'
 
         pc = {
@@ -418,7 +418,7 @@ def date_headers(tasks, color, trimmings):
         if title != previous_title:
             previous_title = title
             buff = get_console_size()[1] - len(title)
-            print('\x1b[48;5;18m{}{}\x1b[0m'.format(title, ' '*buff))
+            print('\x1b[48;5;0m{}{}\x1b[0m'.format(title, ' '*buff))
         print(t.compose_line(color, trimmings))
 
 

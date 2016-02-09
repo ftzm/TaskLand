@@ -20,6 +20,8 @@ with open(os.path.join(__location__, "config.rc"), "r") as f:
             todolist = line[len('list-location='):-1]
         if line.startswith('default-command='):
             default_command = line[len('default-command='):-1]
+        if line.startswith('archive-location='):
+            archive_location = line[len('archive-location='):-1]
 
 with open(todolist, "r") as f:
     file = f.readlines()
@@ -242,7 +244,7 @@ def code_to_datetime(s):
     if s[0] in weekdays:
         date = weekday_to_datetime(s)
     elif s[0] == 'n':
-        date = datetime.date.today()
+        date = datetime.datoday()
     elif s[0].isdigit():
         date = date_to_datetime(s)
     else:
@@ -738,6 +740,16 @@ def write_tasks(tasks):
             f.write(line + '\n')
 
 
+def archive_done(tasks):
+    to_go = [t for t in tasks if t.done is not None]
+    to_stay = [t for t in tasks if t not in to_go]
+    to_go_lines = [t.compose_line(False, ['n']) for t in to_go]
+    with open(archive_location, "a") as f:
+        for line in to_go_lines:
+            f.write(line + '\n')
+    return to_stay
+
+
 view_commands = [
     ('bc', (view_by_context, 0, 0)),
     ('bp', (view_by_project, 0, 0)),
@@ -781,7 +793,8 @@ action_commands = [
     ]
 action_commands = collections.OrderedDict(action_commands)
 general_commands = [
-    ('catch', (catch))
+    ('catch', (catch)),
+    ('archive', (archive_done)),
     ]
 general_commands = collections.OrderedDict(general_commands)
 

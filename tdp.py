@@ -7,24 +7,26 @@ import collections
 import readline
 import copy
 import base62
+import config
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-todolist = None
-default_command = None
+defaults = {
+    'list_location': 'todo.txt',
+    'default_command': 'h',
+    'archive_location': 'archive.txt',
+    }
 
-with open(os.path.join(__location__, "config.rc"), "r") as f:
-    for line in f.readlines():
-        if line.startswith('list-location='):
-            todolist = line[len('list-location='):-1]
-        if line.startswith('default-command='):
-            default_command = line[len('default-command='):-1]
-        if line.startswith('archive-location='):
-            archive_location = line[len('archive-location='):-1]
+settings = config.process_config(__location__, defaults)
 
-with open(todolist, "r") as f:
-    file = f.readlines()
+try:
+    with open(settings['list_location'], 'r') as f:
+        file = f.readlines()
+except FileNotFoundError:
+    with open(settings['list_location'], 'w+') as f:
+        file = f.readlines()
+
 
 x_re = re.compile('^(x)')
 pri_re = re.compile('^(\([A-Z]\))')
@@ -735,7 +737,7 @@ def collect_tasks():
 
 def write_tasks(tasks):
     lines = [t.compose_line(False, ['n'], i+1) for i, t in enumerate(tasks)]
-    with open(todolist, "w") as f:
+    with open(settings['list_location'], "w") as f:
         for line in lines:
             f.write(line + '\n')
 
@@ -744,7 +746,7 @@ def archive_done(tasks):
     to_go = [t for t in tasks if t.done is not None]
     to_stay = [t for t in tasks if t not in to_go]
     to_go_lines = [t.compose_line(False, ['n']) for t in to_go]
-    with open(archive_location, "a") as f:
+    with open(settings['archive_location'], "a") as f:
         for line in to_go_lines:
             f.write(line + '\n')
     return to_stay
@@ -1055,7 +1057,7 @@ def handle_general_commands(arg):
 
 def main(args):
     if len(args) == 0:
-        args = default_command.split(' ')
+        args = settings['default_command'].split(' ')
     if args[0] in view_commands.keys():
         handle_view_commands(args)
     elif args[0] in action_commands.keys() or args[0].isdigit():

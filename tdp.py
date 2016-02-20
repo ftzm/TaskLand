@@ -416,7 +416,10 @@ def date_headers(tasks, color, trimmings):
         elif t.x is not None:
             title = 'Finished'
         elif t.due:
-            title = t.due.strftime('%Y-%m-%d')
+            if t.due == datetime.date.today():
+                title = 'Today'
+            else:
+                title = t.due.strftime('%Y-%m-%d')
         else:
             title = 'Future'
         if title != previous_title:

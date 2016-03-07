@@ -1,0 +1,9 @@
+automatically send to archive after two days
+
+install setup
+
+docs
+
+output on successful actions.
+
+make commands and args unconflict and clean up mess in assemble_action_command_list

@@ -1,16 +1,16 @@
 #!/usr/bin/python
 import sys
-import re
 import os
-import datetime
 import collections
-import readline
-import copy
-import base62
 import config
+import parse
+import views
+import actions
+import utils
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
 
 defaults = {
     'list_location': 'todo.txt',
@@ -28,697 +28,18 @@ except FileNotFoundError:
         file = f.readlines()
 
 
-x_re = re.compile('^(x)')
-pri_re = re.compile('^(\([A-Z]\))')
-p_re = re.compile('\+(\w+)')
-c_re = re.compile('@(\w+)')
-a_re = re.compile('A:([\d\-]+)')
-p_id_re = re.compile('P:(\w+)')
-c_id_re = re.compile('C:(\d+)')
-r_id_re = re.compile('R:(\w+)')
-o_re = re.compile('O:(\w+)')
-date_re = re.compile('(\d{4}-\d{2}-\d{2})')
-
-weekdays = ['m', 't', 'w', 'r', 'f', 's', 'u']
-
-
-def extract(line, reg):
-    target = reg.search(line)
-    if target:
-        s = target.start()
-        e = target.end()
-        target = target.group(1)
-        line = ''.join([line[:s], line[e:]])
-    return line, target
-
-
-def extract_all(line, reg):
-    targets = []
-    target = ''
-    while target is not None:
-        target = reg.search(line)
-        if target is not None:
-            s = target.start()
-            e = target.end()
-            target = target.group(1)
-            targets.append(target)
-            line = ''.join([line[:s], line[e:]])
-    return line, targets
-
-
-class Task(object):
-    def __init__(self, line):
-        self.num = 0
-        line, self.x = extract(line, x_re)
-        line, self.priority = extract(line, pri_re)
-        line, self.added = extract(line, a_re)
-        line, dates = extract_all(line, date_re)
-        line, self.order = extract(line, o_re)
-        if self.order is not None:
-            try:
-                self.order = base62.decode(self.order)
-            except:
-                print('Error: corrupted order code')
-        line, self.contexts = extract_all(line, c_re)
-        line, self.projects = extract_all(line, p_re)
-        line, self.parent_id = extract(line, p_id_re)
-        if self.parent_id is not None and 'c' in self.parent_id:
-            self.parent_id = self.parent_id[:-1]
-            self.contracted = True
-        else:
-            self.contracted = False
-        line, self.child_id = extract(line, c_id_re)
-        line, self.repeat = extract(line, r_id_re)
-        self.text = line.strip()
-
-        if self.added is not None:
-            self.added = datetime.date(*map(int, self.added.split('-')))
-
-        dates = [datetime.date(*map(int, d.split('-'))) for d in dates]
-        datenum = len(dates)
-        if datenum == 2:
-            self.done, self.due = dates[0], dates[1]
-        elif datenum == 1 and self.x is not None:
-            self.done, self.due = dates[0], None
-        elif datenum == 1:
-            self.done, self.due = None, dates[0]
-        else:
-            self.done, self.due = None, None
-
-    def compose_parts(self, order, exclusions=None):
-        parts = ['n', 'x', 'pr', 'dn', 'd', 't', 'p', 'c',
-                 'r', 'a', 'o', 'p_id', 'c_id']
-
-        if exclusions is not None:
-            parts = [p for p in parts if p not in exclusions]
-
-        conversions = {
-            'n': '{:>3}'.format(self.num),
-            'x': self.x,
-            'pr': self.priority,
-            'dn': self.done.strftime('%Y-%m-%d') if self.done else None,
-            'd': self.due.strftime('%Y-%m-%d') if self.due else None,
-            'a': self.added.strftime('A:%Y-%m-%d') if self.added else None,
-            'o': 'O:{}'.format(base62.encode(order)),
-            'p': ' '.join(['+{}'.format(p) for p in self.projects])
-                 if self.projects else None,
-            'c': ' '.join(['@{}'.format(c) for c in self.contexts])
-                 if self.contexts else None,
-            'p_id': ''.join(['P:', self.parent_id, 'c' if self.contracted
-                             else '']) if self.parent_id else None,
-            'c_id': ''.join(['C:', self.child_id]) if self.child_id else None,
-            'r': ''.join(['R:', self.repeat]) if self.repeat else None,
-            't': self.text
-            }
-
-        output = [(p, conversions[p]) for p in parts]
-
-        return(output)
-
-    def colorize_parts(self, parts):
-        color_prefix = '\x1b[38;5;{}m'
-        unset = '\x1b[0m'
-        red = color_prefix.format(1)
-        green = color_prefix.format(2)
-        yellow = color_prefix.format(3)
-        blue = color_prefix.format(4)
-        magenta = color_prefix.format(13)
-        cyan = color_prefix.format(6)
-        orange = color_prefix.format(9)
-        gray = color_prefix.format(10)
-        white = color_prefix.format(14)
-        # background = '\x1b[48;5;18m'
-
-        pc = {
-            'n': gray,
-            'x': gray,
-            'pr': red,
-            'f': cyan,
-            'dn': gray,
-            'd': orange,
-            'a': green,
-            'o': gray,
-            'p': blue,
-            'c': yellow,
-            'p_id': gray,
-            'c_id': gray,
-            'r': magenta,
-            't': white,
-            }
-
-        output = []
-        for p in parts:
-            if p[1] is not None:
-                output.append((p[0], '{}{}{}'.format(pc[p[0]], p[1], unset)))
-
-        return output
-
-    def compose_line(self, color=True, exclusions=None, order=None):
-        if not order:
-            order = self.num
-        parts = self.compose_parts(order, exclusions)
-        if color:
-            parts = self.colorize_parts(parts)
-        line = ' '.join([p[1] for p in parts if p[1] is not None])
-        return line
-
-
-def projects_get(tasks):
-    return sorted({p for t in tasks for p in t.projects},
-                  key=lambda s: s.lower())
-
-
-def contexts_get(tasks):
-    return sorted({p for t in tasks for p in t.contexts},
-                  key=lambda s: s.lower())
-
-
-def weekday_to_datetime(s):
-    daynum = weekdays.index(s)
-    offset = daynum - int(datetime.date.today().weekday())
-    if offset < 1:
-        offset += 7
-    date = datetime.date.today() + datetime.timedelta(offset)
-    return date
-
-
-def date_to_datetime(s):
-    date = None
-    td = datetime.date.today()
-    td = [td.year, td.month, td.day]
-    month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    if td[0] % 4 == 0:
-        month_lengths[1] = 29
-    if re.match('\d{1,2}$', s):
-        year, month, day = None, None, int(s)
-    elif re.match('\d{1,2}-\d{1,2}$', s):
-        year, month, day = None, tuple([int(i) for i in s.split('-')])
-    elif re.match('\d{4}-\d{1,2}-\d{1,2}$', s):
-        year, month, day = tuple([int(i) for i in s.split('-')])
-
-    # increment month if day is lower than td
-    if day < td[2] and month is None:
-        month = td[1] + 1
-        if month > 12:
-            month = 1
-
-    # set unset months and years
-    if not month:
-        month = td[1]
-    if not year:
-        year = td[0]
-
-    # if month lower than td's, due next year.
-    if month < td[1]:
-        year = td[0] + 1
-
-    # handle edge cases where impossible dates are entered.
-    if month > 12:
-        print("Error: Month must be 12 or below")
-    elif day > month_lengths[month-1]:
-        print("Error: Not that many days in the month")
-    else:
-        date = datetime.date(year, month, day)
-    return date
-
-
-def code_to_datetime(s):
-    if s[0] in weekdays:
-        date = weekday_to_datetime(s)
-    elif s[0] == 'n':
-        date = datetime.datoday()
-    elif s[0].isdigit():
-        date = date_to_datetime(s)
-    else:
-        print('Error: Not a valid date format')
-    return date
-
-
-# ###############
-#
-# View Functions
-#
-# ###############
-
-
-def view_by_project(tasks):
-    return [t for p in projects_get(tasks) for t in tasks if p in t.projects]
-
-
-def view_by_context(tasks):
-    return [t for p in contexts_get(tasks) for t in tasks if p in t.contexts]
-
-
-def filter_contexts(tasks, *strings):
-    return [t for t in tasks if any(s in t.contexts for s in strings)]
-
-
-def filter_projects(tasks, *strings):
-    return [t for t in tasks if any(s in t.projects for s in strings)]
-
-
-def filter_include_any(tasks, *strings):
-    return [t for t in tasks if any(s in t.text for s in strings)]
-
-
-def filter_include_all(tasks, *strings):
-    return [t for t in tasks if all(s in t.text for s in strings)]
-
-
-def filter_exclude(tasks, *strings):
-    return [t for t in tasks if not any(s in t.text for s in strings)]
-
-
-def view_until(tasks, date):
-    """takes datetime object, returns all tasks up to and including date"""
-    return [t for t in tasks if t.due and t.due <= date and not t.x]
-
-
-def view_until_cli(tasks, s):
-    date = code_to_datetime(s)
-    return view_until(tasks, date)
-
-
-def view_today(tasks):
-    return view_until(tasks, datetime.date.today())
-
-
-def view_week(tasks):
-    return view_until(tasks, datetime.date.today()+datetime.timedelta(7))
-
-
-def normal_print(tasks, color, trimmings):
-    for t in tasks:
-        print(t.compose_line(color, trimmings))
-
-
-def nest(tasks, color, trimmings):
-    output_lines = []
-    parents = [t for t in tasks if t.parent_id]
-
-    insert_point = 0
-    i = 0
-    while i < len(parents):
-        if not parents[i].child_id:
-            parents.insert(insert_point, parents.pop(i))
-            insert_point += 1
-        i += 1
-    sorted_parents = insert_point  # number of entries from top that are sorted
-
-    # iterate over sorted tasks, looking for all unsorted children parents
-    # put each child parent under its parent
-    i = 0
-    while i < sorted_parents:
-        child_id = parents[i].parent_id
-        insert_point = i + 1
-        j = sorted_parents
-        while j < len(parents):
-            if child_id == parents[j].child_id:
-                parents.insert(insert_point, parents.pop(j))
-                sorted_parents += 1
-                insert_point += 1
-            j += 1
-        i += 1
-
-    # rearrange children to follow their parents
-    for t in parents:
-        # pop children from lines
-        children = []
-        list_length = len(tasks)
-        i = 0
-        while i < list_length:
-            if t.parent_id == tasks[i].child_id:
-                children.append(tasks.pop(i))
-                list_length -= 1
-            else:
-                i += 1
-        # find where to insert and insert all children
-        insert_point = tasks.index(t) + 1
-        for child in children:
-            tasks.insert(insert_point, child)
-            insert_point += 1
-
-    # pretty indented print
-    hierarchy = []
-    closed_id = 0
-    latest_parent_id = 0
-    for t in tasks:
-        orphan = False
-        # closed/open indicator, set switch to hide following tasks
-        parent_id = t.parent_id
-        if parent_id:
-            latest_parent_id = parent_id
-            if 'c' not in parent_id:
-                line = '  ' + t.compose_line(color, trimmings)
-            else:
-                line = '  ' + t.compose_line(color, trimmings)
-                closed_id = latest_parent_id
-        # align non plus or minused tasks
-        else:
-            line = '  ' + t.compose_line(color, trimmings)
-        # calc indent level based on degree of nested child tags
-        if t.child_id:
-            child_id = t.child_id
-            if child_id not in hierarchy:
-                # necessary to check if child is orphan
-                if child_id == latest_parent_id:
-                    hierarchy.append(child_id)
-                else:
-                    hierarchy = []
-                    orphan = True
-            else:
-                hierarchy = hierarchy[:hierarchy.index(child_id)+1]
-            if not orphan:
-                indents = hierarchy.index(child_id)+1
-            else:
-                indents = 0
-            line = "   " * indents + line
-        else:
-            hierarchy = []
-        # if the closed_id is in the hierarchy, then the task will be hidden
-        if closed_id not in hierarchy:
-            output_lines.append(line)
-
-    for l in output_lines:
-        print(l)
-
-
-def get_console_size():
-    """returns rows and columns as 2 tuple"""
-    return [int(i) for i in os.popen('stty size', 'r').read().split()]
-
-
-def date_headers(tasks, color, trimmings):
-    previous_title = ''
-    for t in tasks:
-        if t.priority is not None:
-            title = 'Prioritized'
-        elif t.x is not None:
-            title = 'Finished'
-        elif t.due:
-            if t.due == datetime.date.today():
-                title = 'Today'
-            else:
-                title = t.due.strftime('%Y-%m-%d')
-        else:
-            title = 'Future'
-        if title != previous_title:
-            previous_title = title
-            buff = get_console_size()[1] - len(title)
-            print('\x1b[48;5;0m{}{}\x1b[0m'.format(title, ' '*buff))
-        print(t.compose_line(color, trimmings))
-
-
-# ###############
-#
-# Action Functions
-#
-# ###############
-
-
-def add(tasks, s):
-    task = Task(s)
-    task.added = datetime.date.today()
-    task.due = datetime.date.today()
-    tasks.append(task)
-    return tasks
-
-
-def prefill_input(prompt, prefill):
-    readline.set_startup_hook(lambda: readline.insert_text(prefill))
-    try:
-        result = input(prompt)
-    finally:
-        readline.set_startup_hook()
-    return result
-
-
-def edit(tasks, n):
-    tasks[n].text = prefill_input('Edit: ', tasks[n].text)
-    return tasks
-
-
-def remove(tasks, n):
-    followthrough = input('Task: {}\nDelete? (Y/n)'.format(
-        tasks[n].compose_line()))
-    if followthrough == '' or followthrough.lower() == 'y':
-        removed = tasks.pop(n)
-        print('Removed: ' + removed.compose_line())
-    return tasks
-
-
-def do(tasks, n):
-    tasks[n].priority = None
-    if tasks[n].parent_id is not None:
-        tasks[n].parent_id = None
-        tasks = clean_orphans(tasks, tasks[n].parent_id)
-    if tasks[n].repeat is not None:
-        tasks = repeat_recycle(tasks, n)
-    else:
-        tasks[n].x = 'x'
-        tasks[n].done = datetime.date.today()
-    return tasks
-
-
-def undo(tasks):
-    return tasks
-
-
-def schedule(tasks, n, s):
-    date = code_to_datetime(s)
-    tasks[n].due = date
-    return tasks
-
-
-def unschedule(tasks, n):
-    tasks[n].due = None
-    return tasks
-
-
-def prioritize(tasks, n, priority='A'):
-    if not priority.isalpha() or len(priority) > 1:
-        print("Not a valid priority")
-    else:
-        priority = priority.upper()
-        tasks[n].priority = '({})'.format(priority)
-    return tasks
-
-
-def unprioritize(tasks, n):
-    tasks[n].priority = None
-    return tasks
-
-
-def set_contexts(tasks, n, contexts):
-    tasks[n].contexts.append(contexts)
-    return tasks
-
-
-def unset_contexts(tasks, n, i):
-    tasks[n].contexts.pop(i-1)
-    return tasks
-
-
-def set_projects(tasks, n, projects):
-    tasks[n].projects.append(projects)
-    return tasks
-
-
-def unset_projects(tasks, n, i=1):
-    tasks[n].projects.pop(int(i)-1)
-    return tasks
-
-
-def parent_set(tasks, n):
-    parent_ids = [t.parent_id for t in tasks if t.parent_id is not None]
-    for i in range(1, len(parent_ids)+2):
-        if str(i) not in parent_ids:
-            new_id = i
-            break
-    tasks[n].parent_id = str(new_id)
-    return tasks
-
-
-def parent_unset(tasks, n):
-    tasks[n].parent_id = None
-    return tasks
-
-
-def parent_check_empty(tasks, id):
-    if not any(t.child_id == id for t in tasks):
-        for t in tasks:
-            if t.parent_id == id:
-                t.parent_id = None
-    return tasks
-
-
-def child_set(tasks, n, p):
-    p = int(p) - 1
-    if tasks[p].parent_id is None:
-        tasks = parent_set(tasks, p)
-    tasks[n].child_id = tasks[p].parent_id
-    return tasks
-
-
-def child_unset(tasks, n):
-    child_id = tasks[n].child_id
-    tasks[n].child_id = None
-    tasks = parent_check_empty(tasks, child_id)
-    return tasks
-
-
-def clean_orphans(tasks, id):
-    for t in tasks:
-        if t.child_id == id:
-            t.child_id = None
-
-
-def contract(tasks, n):
-    tasks[n].contracted = True
-    return tasks
-
-
-def expand(tasks, n):
-    tasks[n].contracted = True
-    return tasks
-
-
-def future_find_last_num(tasks):
-    for i in range(len(tasks)-1, -1, -1):
-        if tasks[i].future is not None:
-            return int(tasks[i].future)
-    return 0000000
-
-
-def future_redistribute(tasks):
-    last = 0
-    for t in tasks:
-        if t.future is not None:
-            last = last + 10000
-            t.future = last
-    return tasks
-
-
-def future_set(tasks, n):
-    tasks[n].due = None
-    return tasks
-
-
-def order_after(tasks, n, p):
-    pivot_i = int(p)-1
-    if tasks[n].due != tasks[pivot_i].due:
-        print('Can\'t order tasks with different due dates against each other')
-        return tasks
-    if pivot_i > n:
-        pivot_i -= 1
-    moved = tasks.pop(n)
-    tasks.insert(pivot_i+1, moved)
-    return tasks
-
-
-def order_before(tasks, n, p):
-    pivot_i = int(p)-1
-    if tasks[n].due != tasks[pivot_i].due:
-        print('Can\'t order tasks with different due dates against each other')
-        return tasks
-    if pivot_i > n:
-        pivot_i -= 1
-    moved = tasks.pop(n)
-    tasks.insert(pivot_i, moved)
-    return tasks
-
-
-def repeat_unset(tasks, n):
-    tasks[n].repeat = None
-    return tasks
-
-
-def repeat_set(tasks, n, s):
-    t = tasks[n]
-    if t.added is None:
-        t.added = datetime.date.today()
-    if re.match('a\d{1,2}$', s):
-        t.repeat = s
-    elif re.match('e\d{1,2}$', s):
-        t.repeat = s
-        if t.added is not None and t.due is not None:
-            t.repeat = t.repeat + 'c' + str((t.due - t.added).days)
-        else:
-            t.repeat += 'c0'
-    elif re.match('[mtwrfsu]{1,7}', s):
-        t.repeat = ''.join(c for c in "mtwrfsu" if c in s)
-    else:
-        print('Error: Not a valid recur format')
-    return tasks
-
-
-def repeat_recycle(tasks, n):
-    t = tasks[n]
-    td = datetime.date.today()
-
-    t_done = copy.deepcopy(t)
-    t_done.x = 'x'
-    t_done.done = td
-    tasks.append(t_done)
-
-    if 'a' in t.repeat:
-        interval = int(t.repeat[1:])
-        t.due = datetime.date.today() + datetime.timedelta(interval)
-    elif 'e' in t.repeat:
-        nums = t.repeat[1:].split('c')
-        interval = int(nums[0])
-        # date it should have been done on ([-1] to use correction if there)
-        intended_date = t.added + datetime.timedelta(int(nums[-1]))
-        t.due = intended_date + datetime.timedelta(interval)
-        while t.due < td:
-            t.due += datetime.timedelta(interval)
-        t.repeat = 'e' + str(interval)
-        # set correction if today wasn't due day
-        if t.due != td + datetime.timedelta(interval):
-            t.repeat += 'c' + str((t.due - td).days)
-    else:
-        interval = 1
-        i = td.weekday() + 1
-        while i != td.weekday():
-            if i > 6:
-                i = 0
-            if weekdays[i] in t.repeat:
-                break
-            i += 1
-            interval += 1
-        t.due = td + datetime.timedelta(interval)
-
-    # now turn existing task into recurred version
-    t.added = td
-    t.priority = None
-    return tasks
-
-
-def catch(tasks):
-    for i, t in enumerate(tasks):
-        if t.due < datetime.date.today() and \
-                t.x is None and t.due is not None:
-            sched = input('{}\nNew due date (blank for future): '.format(
-                t.text))
-            if sched == '':
-                tasks = future_set(tasks, i)
-            else:
-                t.due = code_to_datetime(sched)
-    return tasks
-
-
 def print_projects():
     tasks = collect_tasks()
-    print('\n'.join(projects_get(tasks)))
+    print('\n'.join(utils.projects_get(tasks)))
 
 
 def print_contexts():
     tasks = collect_tasks()
-    print('\n'.join(contexts_get(tasks)))
+    print('\n'.join(utils.contexts_get(tasks)))
 
 
 def collect_tasks():
-    tasks = [Task(l) for l in sorted(file)]
+    tasks = [parse.Task(l) for l in sorted(file)]
     bins = []
     bin = []
     prev = None
@@ -756,49 +77,49 @@ def archive_done(tasks):
 
 
 view_commands = [
-    ('bc', (view_by_context, 0, 0)),
-    ('bp', (view_by_project, 0, 0)),
-    ('vc', (filter_contexts, 1, 9)),
-    ('vp', (filter_projects, 1, 9)),
-    ('any', (filter_include_all, 1, 9)),
-    ('all', (filter_include_any, 1, 9)),
-    ('excl', (filter_exclude, 1, 9)),
-    ('today', (view_today, 0, 0)),
-    ('week', (view_week, 0, 0)),
-    ('until', (view_until_cli, 1, 1)),
+    ('bc', (views.view_by_context, 0, 0)),
+    ('bp', (views.view_by_project, 0, 0)),
+    ('vc', (views.filter_contexts, 1, 9)),
+    ('vp', (views.filter_projects, 1, 9)),
+    ('any', (views.filter_include_all, 1, 9)),
+    ('all', (views.filter_include_any, 1, 9)),
+    ('excl', (views.filter_exclude, 1, 9)),
+    ('today', (views.view_today, 0, 0)),
+    ('week', (views.view_week, 0, 0)),
+    ('until', (views.view_until_cli, 1, 1)),
     ('trim', ('trim', 1, 9)),
     ('nocolor', ('nocolor', 0, 0)),
-    ('nest', (nest, 0, 0)),
-    ('h', (date_headers, 0, 0)),
+    ('nest', (views.nest, 0, 0)),
+    ('h', (views.date_headers, 0, 0)),
     ]
 view_commands = collections.OrderedDict(view_commands)
 action_commands = [
-    ('a', (add, 1, 100)),  # 'a' has numbers for show atm
-    ('ed', (edit, 0, 0)),
-    ('rm', (remove, 0, 0)),
-    ('do', (do, 0, 0)),
-    ('undo', (undo, 0, 0)),
-    ('s', (schedule, 1, 1)),
-    ('us', (unschedule, 0, 0)),
-    ('pr', (prioritize, 1, 1)),
-    ('upr', (unprioritize, 0, 0)),
-    ('c', (set_contexts, 1, 9)),
-    ('uc', (unset_contexts, 1, 1)),
-    ('p', (set_projects, 1, 9)),
-    ('up', (unset_projects, 1, 1)),
-    ('sub', (child_set, 1, 1)),
-    ('usub', (child_unset, 0, 0)),
-    ('cn', (contract, 0, 0)),
-    ('ex', (expand, 0, 0)),
-    ('f', (future_set, 0, 0)),
-    ('sb', (order_before, 1, 1)),
-    ('sa', (order_after, 1, 1)),
-    ('re', (repeat_set, 1, 1)),
-    ('ure', (repeat_unset, 0, 0)),
+    ('a', (actions.add, 1, 100)),  # 'a' has numbers for show atm
+    ('ed', (actions.edit, 0, 0)),
+    ('rm', (actions.remove, 0, 0)),
+    ('do', (actions.do, 0, 0)),
+    ('undo', (actions.undo, 0, 0)),
+    ('s', (actions.schedule, 1, 1)),
+    ('us', (actions.unschedule, 0, 0)),
+    ('pr', (actions.prioritize, 1, 1)),
+    ('upr', (actions.unprioritize, 0, 0)),
+    ('c', (actions.set_contexts, 1, 9)),
+    ('uc', (actions.unset_contexts, 1, 1)),
+    ('p', (actions.set_projects, 1, 9)),
+    ('up', (actions.unset_projects, 1, 1)),
+    ('sub', (actions.child_set, 1, 1)),
+    ('usub', (actions.child_unset, 0, 0)),
+    ('cn', (actions.contract, 0, 0)),
+    ('ex', (actions.expand, 0, 0)),
+    ('f', (actions.future_set, 0, 0)),
+    ('sb', (actions.order_before, 1, 1)),
+    ('sa', (actions.order_after, 1, 1)),
+    ('re', (actions.repeat_set, 1, 1)),
+    ('ure', (actions.repeat_unset, 0, 0)),
     ]
 action_commands = collections.OrderedDict(action_commands)
 general_commands = [
-    ('catch', (catch)),
+    ('catch', (actions.catch)),
     ('archive', (archive_done)),
     ]
 general_commands = collections.OrderedDict(general_commands)
@@ -847,7 +168,7 @@ def verify_view_command_list(command_list):
 
 def execute_view_command_list(command_list):
     # establish print method
-    print_command = normal_print
+    print_command = views.normal_print
     color = True
     trimmings = []
     i = 0
@@ -912,7 +233,7 @@ def assemble_action_command_list(args, target):
                         i += 1
                         if target is not None:
                             continue
-                    if args[i].isdigit or args[i] in weekdays:
+                    if args[i].isdigit or args[i] in utils.weekdays:
                         command_list[-1][1].append(args[i])
             else:
                 try:
@@ -1032,7 +353,7 @@ def handle_action_commands(args):
             print("Error: new task must contain text")
             return
         else:
-            tasks = add(tasks, addition)
+            tasks = actions.add(tasks, addition)
             target = len(tasks) - 1
 
     if target is None:

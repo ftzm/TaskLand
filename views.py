@@ -5,32 +5,39 @@ import datetime
 
 
 def view_by_project(tasks):
+    """return list of tasks sorted by project"""
     return [t for p in utils.projects_get(tasks) for t in tasks
             if p in t.projects]
 
 
 def view_by_context(tasks):
+    """return list of tasks sorted by project"""
     return [t for p in utils.contexts_get(tasks) for t in tasks
             if p in t.contexts]
 
 
 def filter_contexts(tasks, *strings):
+    """return list of tasks whose contexts contain any of supplied strings"""
     return [t for t in tasks if any(s in t.contexts for s in strings)]
 
 
 def filter_projects(tasks, *strings):
+    """return list of tasks whose projects contian any of supplied strings"""
     return [t for t in tasks if any(s in t.projects for s in strings)]
 
 
 def filter_include_any(tasks, *strings):
+    """return list of tasks whose text include any of supplied strings"""
     return [t for t in tasks if any(s in t.text for s in strings)]
 
 
 def filter_include_all(tasks, *strings):
+    """return list of tasks whose text include all of supplied strings"""
     return [t for t in tasks if all(s in t.text for s in strings)]
 
 
 def filter_exclude(tasks, *strings):
+    """return list of tasks whose text include none of supplied strings"""
     return [t for t in tasks if not any(s in t.text for s in strings)]
 
 
@@ -40,24 +47,29 @@ def view_until(tasks, date):
 
 
 def view_until_cli(tasks, s):
+    """return list of tasks that are due up until the supplied date"""
     date = utils.code_to_datetime(s)
     return view_until(tasks, date)
 
 
 def view_today(tasks):
+    """return list of tasks that are due up until today"""
     return view_until(tasks, datetime.date.today())
 
 
 def view_week(tasks):
+    """view tasks due within the coming week"""
     return view_until(tasks, datetime.date.today()+datetime.timedelta(7))
 
 
 def normal_print(tasks, color, trimmings):
+    """print tasks using basic print method"""
     for t in tasks:
         print(t.compose_line(color, trimmings))
 
 
 def nest(tasks, color, trimmings):
+    """print tasks in a nested format"""
     output_lines = []
     parents = [t for t in tasks if t.parent_id]
 
@@ -154,6 +166,7 @@ def get_console_size():
 
 
 def date_headers(tasks, color, trimmings):
+    """print lines with date headers"""
     previous_title = ''
     for t in tasks:
         if t.priority is not None:

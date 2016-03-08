@@ -1,4 +1,4 @@
-automatically send to archive after two days
+sutomatically send to archive after two days
 
 install setup
 
@@ -7,3 +7,16 @@ docs
 output on successful actions.
 
 make commands and args unconflict and clean up mess in assemble_action_command_list
+
+docstrings
+    config
+    utils
+    main
+
+undo function
+
+perhaps refactor to make a list object.
+
+move edit command to task object, along with others specific to change
+
+ensure zsh completion is up to date

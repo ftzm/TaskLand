@@ -8,6 +8,7 @@ import utils
 
 
 def add(tasks, s):
+    """add a task"""
     task = parse.Task(s)
     task.added = datetime.date.today()
     task.due = datetime.date.today()
@@ -16,6 +17,7 @@ def add(tasks, s):
 
 
 def prefill_input(prompt, prefill):
+    """prompt for input with supplied prefill text"""
     readline.set_startup_hook(lambda: readline.insert_text(prefill))
     try:
         result = input(prompt)
@@ -25,11 +27,13 @@ def prefill_input(prompt, prefill):
 
 
 def edit(tasks, n):
+    """edit a tasks's text"""
     tasks[n].text = prefill_input('Edit: ', tasks[n].text)
     return tasks
 
 
 def remove(tasks, n):
+    """remove a task"""
     followthrough = input('Task: {}\nDelete? (Y/n)'.format(
         tasks[n].compose_line()))
     if followthrough == '' or followthrough.lower() == 'y':
@@ -39,6 +43,7 @@ def remove(tasks, n):
 
 
 def do(tasks, n):
+    """mark a task as completed"""
     tasks[n].priority = None
     if tasks[n].parent_id is not None:
         tasks[n].parent_id = None
@@ -52,21 +57,25 @@ def do(tasks, n):
 
 
 def undo(tasks):
+    """unmark a task as completed, yet to be implemented"""
     return tasks
 
 
 def schedule(tasks, n, s):
+    """schedule a task as due a certain date using date string"""
     date = utils.code_to_datetime(s)
     tasks[n].due = date
     return tasks
 
 
 def unschedule(tasks, n):
+    """remove due date from a task"""
     tasks[n].due = None
     return tasks
 
 
 def prioritize(tasks, n, priority='A'):
+    """asign a priority (A-Z) to a task"""
     if not priority.isalpha() or len(priority) > 1:
         print("Not a valid priority")
     else:
@@ -76,31 +85,41 @@ def prioritize(tasks, n, priority='A'):
 
 
 def unprioritize(tasks, n):
+    """remove a priority from a task"""
     tasks[n].priority = None
     return tasks
 
 
-def set_contexts(tasks, n, contexts):
-    tasks[n].contexts.append(contexts)
+def set_context(tasks, n, context):
+    """add a context to a task"""
+    tasks[n].contexts.append(context)
     return tasks
 
 
-def unset_contexts(tasks, n, i):
+def unset_context(tasks, n, i):
+    """remove the n context from a task"""
     tasks[n].contexts.pop(i-1)
     return tasks
 
 
-def set_projects(tasks, n, projects):
-    tasks[n].projects.append(projects)
+def set_project(tasks, n, project):
+    """add a project to a task"""
+    tasks[n].projects.append(project)
     return tasks
 
 
-def unset_projects(tasks, n, i=1):
+def unset_project(tasks, n, i=1):
+    """remove a project from a task"""
     tasks[n].projects.pop(int(i)-1)
     return tasks
 
 
 def parent_set(tasks, n):
+    """
+    mark a task as a parent such that other tasks can become its children.
+
+    finds all other parent ids in task list and assigns a new one.
+    """
     parent_ids = [t.parent_id for t in tasks if t.parent_id is not None]
     for i in range(1, len(parent_ids)+2):
         if str(i) not in parent_ids:
@@ -111,11 +130,20 @@ def parent_set(tasks, n):
 
 
 def parent_unset(tasks, n):
+    """
+    remove a parent id from a task.
+    """
     tasks[n].parent_id = None
     return tasks
 
 
 def parent_check_empty(tasks, id):
+    """
+    removes parent id if no corresponding children.
+
+    checks if any task possesses a given child id, and if not, finds
+    the task with the corresponding parent id and removes that id.
+    """
     if not any(t.child_id == id for t in tasks):
         for t in tasks:
             if t.parent_id == id:
@@ -124,6 +152,7 @@ def parent_check_empty(tasks, id):
 
 
 def child_set(tasks, n, p):
+    """make a task the child of another task."""
     p = int(p) - 1
     if tasks[p].parent_id is None:
         tasks = parent_set(tasks, p)
@@ -132,6 +161,7 @@ def child_set(tasks, n, p):
 
 
 def child_unset(tasks, n):
+    """remove child id from task, checks if parent childless"""
     child_id = tasks[n].child_id
     tasks[n].child_id = None
     tasks = parent_check_empty(tasks, child_id)
@@ -139,43 +169,32 @@ def child_unset(tasks, n):
 
 
 def clean_orphans(tasks, id):
+    """remove child id from al tasks"""
     for t in tasks:
         if t.child_id == id:
             t.child_id = None
 
 
 def contract(tasks, n):
+    """set a task as contracted so its children are hidden in nest view"""
     tasks[n].contracted = True
     return tasks
 
 
 def expand(tasks, n):
+    """expand a contracted task so that its children show in nest view"""
     tasks[n].contracted = True
     return tasks
 
 
-def future_find_last_num(tasks):
-    for i in range(len(tasks)-1, -1, -1):
-        if tasks[i].future is not None:
-            return int(tasks[i].future)
-    return 0000000
-
-
-def future_redistribute(tasks):
-    last = 0
-    for t in tasks:
-        if t.future is not None:
-            last = last + 10000
-            t.future = last
-    return tasks
-
-
 def future_set(tasks, n):
+    """remove due date such that task is treated as due indefinite future"""
     tasks[n].due = None
     return tasks
 
 
 def order_after(tasks, n, p):
+    """place a task after another in the list"""
     pivot_i = int(p)-1
     if tasks[n].due != tasks[pivot_i].due:
         print('Can\'t order tasks with different due dates against each other')
@@ -188,6 +207,7 @@ def order_after(tasks, n, p):
 
 
 def order_before(tasks, n, p):
+    """place a task before another in the list"""
     pivot_i = int(p)-1
     if tasks[n].due != tasks[pivot_i].due:
         print('Can\'t order tasks with different due dates against each other')
@@ -200,11 +220,13 @@ def order_before(tasks, n, p):
 
 
 def repeat_unset(tasks, n):
+    """remove the repeat tag from a task"""
     tasks[n].repeat = None
     return tasks
 
 
 def repeat_set(tasks, n, s):
+    """set a task as repeating, specify repeat type and details in tag"""
     t = tasks[n]
     if t.added is None:
         t.added = datetime.date.today()
@@ -224,6 +246,7 @@ def repeat_set(tasks, n, s):
 
 
 def repeat_recycle(tasks, n):
+    """on completion of repeating task, make new due date and update tag"""
     t = tasks[n]
     td = datetime.date.today()
 
@@ -266,6 +289,7 @@ def repeat_recycle(tasks, n):
 
 
 def catch(tasks):
+    """iterate over all tasks due before today and ask for new duedate"""
     for i, t in enumerate(tasks):
         if t.due < datetime.date.today() and \
                 t.x is None and t.due is not None:

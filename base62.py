@@ -1,8 +1,11 @@
+#!/usr/bin/python
+
 BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 BASE = len(BASE62)
 
 
 def encode(num, numerals=BASE62):
+    """encode a decimal number to base62"""
     if num == 0:
         return numerals[0]
     # add handling for negative numbers. maybe
@@ -14,6 +17,7 @@ def encode(num, numerals=BASE62):
 
 
 def decode(s, numerals=BASE62):
+    """decode a base62 number to a decimal"""
     strlen = len(s)
     num = 0
     idx = 0

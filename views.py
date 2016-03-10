@@ -1,7 +1,10 @@
 #!/usr/bin/python
+
+"""functions for filtering and printing the task list"""
+
+import datetime
 import os
 import utils
-import datetime
 
 
 def view_by_project(tasks):
@@ -46,9 +49,9 @@ def view_until(tasks, date):
     return [t for t in tasks if t.due and t.due <= date and not t.x]
 
 
-def view_until_cli(tasks, s):
+def view_until_cli(tasks, string):
     """return list of tasks that are due up until the supplied date"""
-    date = utils.code_to_datetime(s)
+    date = utils.code_to_datetime(string)
     return view_until(tasks, date)
 
 
@@ -68,52 +71,24 @@ def normal_print(tasks, color, trimmings):
         print(t.compose_line(color, trimmings))
 
 
+def nest_sort(tasks):
+    """sort all children to be under their parents"""
+    nest_sorted = [t for t in tasks if not t.child_id]
+    remaining = [t for t in tasks if t not in nest_sorted]
+    for i in range(len(tasks)):
+        if nest_sorted[i].parent_id:
+            children = [t for t in remaining
+                        if t.child_id == nest_sorted[i].parent_id]
+            remaining = [t for t in remaining if t not in children]
+            nest_sorted = nest_sorted[:i+1] + children + nest_sorted[i+1:]
+    return nest_sorted
+
+
 def nest(tasks, color, trimmings):
     """print tasks in a nested format"""
+
+    tasks = nest_sort(tasks)
     output_lines = []
-    parents = [t for t in tasks if t.parent_id]
-
-    insert_point = 0
-    i = 0
-    while i < len(parents):
-        if not parents[i].child_id:
-            parents.insert(insert_point, parents.pop(i))
-            insert_point += 1
-        i += 1
-    sorted_parents = insert_point  # number of entries from top that are sorted
-
-    # iterate over sorted tasks, looking for all unsorted children parents
-    # put each child parent under its parent
-    i = 0
-    while i < sorted_parents:
-        child_id = parents[i].parent_id
-        insert_point = i + 1
-        j = sorted_parents
-        while j < len(parents):
-            if child_id == parents[j].child_id:
-                parents.insert(insert_point, parents.pop(j))
-                sorted_parents += 1
-                insert_point += 1
-            j += 1
-        i += 1
-
-    # rearrange children to follow their parents
-    for t in parents:
-        # pop children from lines
-        children = []
-        list_length = len(tasks)
-        i = 0
-        while i < list_length:
-            if t.parent_id == tasks[i].child_id:
-                children.append(tasks.pop(i))
-                list_length -= 1
-            else:
-                i += 1
-        # find where to insert and insert all children
-        insert_point = tasks.index(t) + 1
-        for child in children:
-            tasks.insert(insert_point, child)
-            insert_point += 1
 
     # pretty indented print
     hierarchy = []
@@ -121,39 +96,38 @@ def nest(tasks, color, trimmings):
     latest_parent_id = 0
     for t in tasks:
         orphan = False
-        # closed/open indicator, set switch to hide following tasks
-        parent_id = t.parent_id
-        if parent_id:
-            latest_parent_id = parent_id
-            if 'c' not in parent_id:
-                line = '  ' + t.compose_line(color, trimmings)
-            else:
-                line = '  ' + t.compose_line(color, trimmings)
-                closed_id = latest_parent_id
-        # align non plus or minused tasks
-        else:
-            line = '  ' + t.compose_line(color, trimmings)
+
         # calc indent level based on degree of nested child tags
-        if t.child_id:
-            child_id = t.child_id
-            if child_id not in hierarchy:
+        indents = 0
+        if t.child_id is not None:
+            if t.child_id not in hierarchy:
                 # necessary to check if child is orphan
-                if child_id == latest_parent_id:
-                    hierarchy.append(child_id)
+                if t.child_id == latest_parent_id:
+                    hierarchy.append(t.child_id)
                 else:
                     hierarchy = []
                     orphan = True
             else:
-                hierarchy = hierarchy[:hierarchy.index(child_id)+1]
+                hierarchy = hierarchy[:hierarchy.index(t.child_id)+1]
             if not orphan:
-                indents = hierarchy.index(child_id)+1
-            else:
-                indents = 0
-            line = "   " * indents + line
+                indents = hierarchy.index(t.child_id)+1
         else:
             hierarchy = []
+
+        # closed/open indicator, set switch to hide following tasks
+        if t.parent_id:
+            latest_parent_id = t.parent_id
+            if t.contracted:
+                closed_id = latest_parent_id
+                prefix = '-'
+            else:
+                prefix = '+'
+        else:
+            prefix = ' '  # so non-parents stay lined up
+
         # if the closed_id is in the hierarchy, then the task will be hidden
         if closed_id not in hierarchy:
+            line = '   ' * indents + prefix + t.compose_line(color, trimmings)
             output_lines.append(line)
 
     for l in output_lines:

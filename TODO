@@ -1,22 +1,28 @@
-sutomatically send to archive after two days
+Refactoring
+-----------
 
-install setup
-
-docs
-
-output on successful actions.
-
+perhaps refactor to make a list object.
 make commands and args unconflict and clean up mess in assemble_action_command_list
-
+move edit command to task object, along with others specific to change
+refactor color application, perhaps to external func.
+refactor arg handingling functions so there's only one general one, simplify, be ruthless.
 docstrings
-    config
     utils
     main
 
+New Features
+------------
+
+next command
 undo function
+output on successful actions.
+automatically send to archive after two days
 
-perhaps refactor to make a list object.
 
-move edit command to task object, along with others specific to change
+Pre-Release
+-----------
 
+docs
+install setup
 ensure zsh completion is up to date
+autocomplete after + or @

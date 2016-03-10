@@ -1,4 +1,14 @@
 #!/usr/bin/python
+
+"""
+File: tdp.py
+Author: Matthew Fitzsimmons
+Email: fitz.matt.d@gmail.com
+Github: https://github.com/ftzm
+Description: cli todolist program
+"""
+
+
 import sys
 import os
 import collections
@@ -20,12 +30,17 @@ defaults = {
 
 settings = config.process_config(__location__, defaults)
 
-try:
-    with open(settings['list_location'], 'r') as f:
-        file = f.readlines()
-except FileNotFoundError:
-    with open(settings['list_location'], 'w+') as f:
-        file = f.readlines()
+
+def open_file():
+    try:
+        with open(settings['list_location'], 'r') as f:
+            file = f.readlines()
+    except FileNotFoundError:
+        with open(settings['list_location'], 'w+') as f:
+            file = f.readlines()
+    return file
+
+todolist = open_file()
 
 
 def print_projects():
@@ -39,21 +54,21 @@ def print_contexts():
 
 
 def collect_tasks():
-    tasks = [parse.Task(l) for l in sorted(file)]
-    bins = []
-    bin = []
+    tasks = [parse.Task(l) for l in sorted(todolist)]
+    taskbins = []
+    taskbin = []
     prev = None
     for t in tasks:
         if t.due == prev:
-            bin.append(t)
+            taskbin.append(t)
         else:
             prev = t.due
-            bins.append(sorted(bin, key=lambda x: x.order if x.order
-                        else 9**9))
-            bin = [t]
-    bins.append(sorted(bin, key=lambda x: x.order if x.order
-                else 9**9))
-    tasks = [t for b in bins for t in b]
+            taskbins.append(sorted(taskbin, key=lambda x: x.order if x.order
+                                   else 9**9))
+            taskbin = [t]
+    taskbins.append(sorted(taskbin, key=lambda x: x.order if x.order
+                           else 9**9))
+    tasks = [t for b in taskbins for t in b]
     for i, t in enumerate(tasks):
         t.num = i+1
     return tasks
@@ -76,7 +91,7 @@ def archive_done(tasks):
     return to_stay
 
 
-view_commands = [
+view_commands = collections.OrderedDict([
     ('bc', (views.view_by_context, 0, 0)),
     ('bp', (views.view_by_project, 0, 0)),
     ('vc', (views.filter_contexts, 1, 9)),
@@ -91,13 +106,13 @@ view_commands = [
     ('nocolor', ('nocolor', 0, 0)),
     ('nest', (views.nest, 0, 0)),
     ('h', (views.date_headers, 0, 0)),
-    ]
-view_commands = collections.OrderedDict(view_commands)
-action_commands = [
+    ])
+
+action_commands = collections.OrderedDict([
     ('a', (actions.add, 1, 100)),  # 'a' has numbers for show atm
     ('ed', (actions.edit, 0, 0)),
     ('rm', (actions.remove, 0, 0)),
-    ('do', (actions.do, 0, 0)),
+    ('do', (actions.complete, 0, 0)),
     ('undo', (actions.undo, 0, 0)),
     ('s', (actions.schedule, 1, 1)),
     ('us', (actions.unschedule, 0, 0)),
@@ -116,13 +131,12 @@ action_commands = [
     ('sa', (actions.order_after, 1, 1)),
     ('re', (actions.repeat_set, 1, 1)),
     ('ure', (actions.repeat_unset, 0, 0)),
-    ]
-action_commands = collections.OrderedDict(action_commands)
-general_commands = [
+    ])
+
+general_commands = collections.OrderedDict([
     ('catch', (actions.catch)),
     ('archive', (archive_done)),
-    ]
-general_commands = collections.OrderedDict(general_commands)
+    ])
 
 
 def assemble_view_command_list(args):
@@ -138,35 +152,37 @@ def assemble_view_command_list(args):
 
 
 def verify_view_command_list(command_list):
+    """check that list of view commands is valid"""
     for command_args in command_list:
         command, args = command_args
-        min = view_commands[command][1]
-        max = view_commands[command][2]
-        if len(args) < min:
-            if min != max:
+        minimum = view_commands[command][1]
+        maximum = view_commands[command][2]
+        if len(args) < minimum:
+            if minimum != maximum:
                 print("Error: '{}' takes at least {} argument{plural}".format(
-                    command, min, plural='' if min == 1 else 's'))
+                    command, minimum, plural='' if minimum == 1 else 's'))
             else:
                 print("Error: '{}' takes {} argument{plural}".format(
-                    command, min, plural='' if min == 1 else 's'))
+                    command, minimum, plural='' if minimum == 1 else 's'))
             return False
-        elif len(args) > max:
-            surplus = args[max]
-            if min != max:
+        elif len(args) > maximum:
+            surplus = args[maximum]
+            if minimum != maximum:
                 print("Error: '{}' takes at most {} argument{plural}, "
                       "and '{}' is not a command".format(
-                          command, max, surplus,
-                          plural='' if max == 1 else 's'))
+                          command, maximum, surplus,
+                          plural='' if maximum == 1 else 's'))
             else:
                 print("Error: '{}' takes {} argument{plural} "
                       "and '{}' is not a command".format(
-                          command, max, surplus,
-                          plural='' if max == 1 else 's'))
+                          command, maximum, surplus,
+                          plural='' if maximum == 1 else 's'))
             return False
     return True
 
 
 def execute_view_command_list(command_list):
+    """executes functions corresponding to view commands"""
     # establish print method
     print_command = views.normal_print
     color = True
@@ -207,6 +223,7 @@ def handle_view_commands(args):
 
 
 def assemble_action_command_list(args, target):
+    """parses list of strings into action commands and arguments"""
     command_list = []
     task_text = False
     i = 0
@@ -267,35 +284,36 @@ def prepare_single_action(command_list):
 
 
 def verify_action_command_list(command_list):
+    """check that list of action commands is valid"""
     for command_args in command_list:
         command, args = command_args
-        min = action_commands[command][1]
-        max = action_commands[command][2]
-        if len(args) < min:
-            if min != max:
-                print("Error: '{}' takes at least {} argument{plural} "
+        minimum = action_commands[command][1]
+        maximum = action_commands[command][2]
+        if len(args) < minimum:
+            if minimum != maximum:
+                print("Error: '{}' takes at least {} argument{pl} "
                       "in addition to the target".format(
-                          command, min, plural='' if min == 1 else 's'))
+                          command, minimum, pl='' if minimum == 1 else 's'))
             else:
                 print(command_list)
-                print("Error: '{}' takes {} argument{plural} "
+                print("Error: '{}' takes {} argument{pl} "
                       "in addition to the target".format(
-                          command, min, plural='' if min == 1 else 's'))
+                          command, minimum, pl='' if minimum == 1 else 's'))
             return False
-        elif len(args) > max:
-            surplus = args[max]
-            if min != max:
-                print("Error: '{}' takes at most {} argument{plural} "
+        elif len(args) > maximum:
+            surplus = args[maximum]
+            if minimum != maximum:
+                print("Error: '{}' takes at most {} argument{pl} "
                       "in addition to the target, and '{}' is not a "
                       "command".format(
-                          command, max, surplus,
-                          plural='' if max == 1 else 's'))
+                          command, maximum, surplus,
+                          pl='' if maximum == 1 else 's'))
             else:
-                print("Error: '{}' takes {} argument{plural} "
+                print("Error: '{}' takes {} argument{pl} "
                       "in addition to the target, and '{}' is not a "
                       "command".format(
-                          command, max, surplus,
-                          plural='' if max == 1 else 's'))
+                          command, maximum, surplus,
+                          pl='' if maximum == 1 else 's'))
             return False
     return True
 
@@ -333,6 +351,7 @@ def extract_task_addition(command_list):
 
 
 def handle_action_commands(args):
+    """coordinates receiving, parsing, executing action commands"""
     tasks = collect_tasks()
 
     # if first arg is an int, extract it as target

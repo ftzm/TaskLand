@@ -1,19 +1,21 @@
 #!/usr/bin/python
+"""task class and functions for parsing lines as tasks"""
+
 import re
-import base62
 import datetime
+import base62
 
 
 x_re = re.compile('^(x)')
-pri_re = re.compile('^(\([A-Z]\))')
-p_re = re.compile('\+(\w+)')
-c_re = re.compile('@(\w+)')
-a_re = re.compile('A:([\d\-]+)')
-p_id_re = re.compile('P:(\w+)')
-c_id_re = re.compile('C:(\d+)')
-r_id_re = re.compile('R:(\w+)')
-o_re = re.compile('O:(\w+)')
-date_re = re.compile('(\d{4}-\d{2}-\d{2})')
+pri_re = re.compile(r'^(\([A-Z]\))')
+p_re = re.compile(r'\+(\w+)')
+c_re = re.compile(r'@(\w+)')
+a_re = re.compile(r'A:([\d\-]+)')
+p_id_re = re.compile(r'P:(\w+)')
+c_id_re = re.compile(r'C:(\d+)')
+r_id_re = re.compile(r'R:(\w+)')
+o_re = re.compile(r'O:(\w+)')
+date_re = re.compile(r'(\d{4}-\d{2}-\d{2})')
 
 
 def extract(line, reg):
@@ -41,18 +43,39 @@ def extract_all(line, reg):
 
 
 class Task(object):
+    """task object"""
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self, line):
+
         self.num = 0
         line, self.x = extract(line, x_re)
         line, self.priority = extract(line, pri_re)
+
         line, self.added = extract(line, a_re)
+        if self.added is not None:
+            self.added = datetime.date(*map(int, self.added.split('-')))
+
         line, dates = extract_all(line, date_re)
+        dates = [datetime.date(*map(int, d.split('-'))) for d in dates]
+        datenum = len(dates)
+        if datenum == 2:
+            self.done, self.due = dates[0], dates[1]
+        elif datenum == 1 and self.x is not None:
+            self.done, self.due = dates[0], None
+        elif datenum == 1:
+            self.done, self.due = None, dates[0]
+        else:
+            self.done, self.due = None, None
         line, self.order = extract(line, o_re)
+
         if self.order is not None:
             try:
                 self.order = base62.decode(self.order)
             except:
                 print('Error: corrupted order code')
+
+
         line, self.contexts = extract_all(line, c_re)
         line, self.projects = extract_all(line, p_re)
         line, self.parent_id = extract(line, p_id_re)
@@ -65,19 +88,7 @@ class Task(object):
         line, self.repeat = extract(line, r_id_re)
         self.text = line.strip()
 
-        if self.added is not None:
-            self.added = datetime.date(*map(int, self.added.split('-')))
 
-        dates = [datetime.date(*map(int, d.split('-'))) for d in dates]
-        datenum = len(dates)
-        if datenum == 2:
-            self.done, self.due = dates[0], dates[1]
-        elif datenum == 1 and self.x is not None:
-            self.done, self.due = dates[0], None
-        elif datenum == 1:
-            self.done, self.due = None, dates[0]
-        else:
-            self.done, self.due = None, None
 
     def compose_parts(self, order, exclusions=None):
         parts = ['n', 'x', 'pr', 'dn', 'd', 't', 'p', 'c',
@@ -107,7 +118,21 @@ class Task(object):
 
         output = [(p, conversions[p]) for p in parts]
 
-        return(output)
+        return output
+
+    def colorize(self, string, color):
+        colors = {
+            'red': 1,
+            'green': 2,
+            'yellow': 3,
+            'blue': 4,
+            'magenta': 13,
+            'cyan': 6,
+            'orange': 9,
+            'gray': 10,
+            'white': 14,
+            }
+        return '\x1b[38;5;{}m{}\x1b[0m'.format(colors[color], string)
 
     def colorize_parts(self, parts):
         color_prefix = '\x1b[38;5;{}m'

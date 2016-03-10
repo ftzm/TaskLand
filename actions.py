@@ -1,15 +1,16 @@
 #!/usr/bin/python
-import parse
+"""functions for making changes to a tasks or the task list"""
 import datetime
 import readline
 import re
 import copy
 import utils
+import parse
 
 
-def add(tasks, s):
+def add(tasks, text):
     """add a task"""
-    task = parse.Task(s)
+    task = parse.Task(text)
     task.added = datetime.date.today()
     task.due = datetime.date.today()
     tasks.append(task)
@@ -26,33 +27,33 @@ def prefill_input(prompt, prefill):
     return result
 
 
-def edit(tasks, n):
+def edit(tasks, num):
     """edit a tasks's text"""
-    tasks[n].text = prefill_input('Edit: ', tasks[n].text)
+    tasks[num].text = prefill_input('Edit: ', tasks[num].text)
     return tasks
 
 
-def remove(tasks, n):
+def remove(tasks, num):
     """remove a task"""
     followthrough = input('Task: {}\nDelete? (Y/n)'.format(
-        tasks[n].compose_line()))
+        tasks[num].compose_line()))
     if followthrough == '' or followthrough.lower() == 'y':
-        removed = tasks.pop(n)
+        removed = tasks.pop(num)
         print('Removed: ' + removed.compose_line())
     return tasks
 
 
-def do(tasks, n):
+def complete(tasks, num):
     """mark a task as completed"""
-    tasks[n].priority = None
-    if tasks[n].parent_id is not None:
-        tasks[n].parent_id = None
-        tasks = clean_orphans(tasks, tasks[n].parent_id)
-    if tasks[n].repeat is not None:
-        tasks = repeat_recycle(tasks, n)
+    tasks[num].priority = None
+    if tasks[num].parent_id is not None:
+        tasks[num].parent_id = None
+        tasks = clean_orphans(tasks, tasks[num].parent_id)
+    if tasks[num].repeat is not None:
+        tasks = repeat_recycle(tasks, num)
     else:
-        tasks[n].x = 'x'
-        tasks[n].done = datetime.date.today()
+        tasks[num].x = 'x'
+        tasks[num].done = datetime.date.today()
     return tasks
 
 
@@ -61,60 +62,60 @@ def undo(tasks):
     return tasks
 
 
-def schedule(tasks, n, s):
+def schedule(tasks, num, string):
     """schedule a task as due a certain date using date string"""
-    date = utils.code_to_datetime(s)
-    tasks[n].due = date
+    date = utils.code_to_datetime(string)
+    tasks[num].due = date
     return tasks
 
 
-def unschedule(tasks, n):
+def unschedule(tasks, num):
     """remove due date from a task"""
-    tasks[n].due = None
+    tasks[num].due = None
     return tasks
 
 
-def prioritize(tasks, n, priority='A'):
+def prioritize(tasks, num, priority='A'):
     """asign a priority (A-Z) to a task"""
     if not priority.isalpha() or len(priority) > 1:
         print("Not a valid priority")
     else:
         priority = priority.upper()
-        tasks[n].priority = '({})'.format(priority)
+        tasks[num].priority = '({})'.format(priority)
     return tasks
 
 
-def unprioritize(tasks, n):
+def unprioritize(tasks, num):
     """remove a priority from a task"""
-    tasks[n].priority = None
+    tasks[num].priority = None
     return tasks
 
 
-def set_context(tasks, n, context):
+def set_context(tasks, num, context):
     """add a context to a task"""
-    tasks[n].contexts.append(context)
+    tasks[num].contexts.append(context)
     return tasks
 
 
-def unset_context(tasks, n, i):
+def unset_context(tasks, num, i):
     """remove the n context from a task"""
-    tasks[n].contexts.pop(i-1)
+    tasks[num].contexts.pop(i-1)
     return tasks
 
 
-def set_project(tasks, n, project):
+def set_project(tasks, num, project):
     """add a project to a task"""
-    tasks[n].projects.append(project)
+    tasks[num].projects.append(project)
     return tasks
 
 
-def unset_project(tasks, n, i=1):
+def unset_project(tasks, num, i=1):
     """remove a project from a task"""
-    tasks[n].projects.pop(int(i)-1)
+    tasks[num].projects.pop(int(i)-1)
     return tasks
 
 
-def parent_set(tasks, n):
+def parent_set(tasks, num):
     """
     mark a task as a parent such that other tasks can become its children.
 
@@ -125,129 +126,130 @@ def parent_set(tasks, n):
         if str(i) not in parent_ids:
             new_id = i
             break
-    tasks[n].parent_id = str(new_id)
+    tasks[num].parent_id = str(new_id)
     return tasks
 
 
-def parent_unset(tasks, n):
+def parent_unset(tasks, num):
     """
     remove a parent id from a task.
     """
-    tasks[n].parent_id = None
+    tasks[num].parent_id = None
     return tasks
 
 
-def parent_check_empty(tasks, id):
+def parent_check_empty(tasks, id_num):
     """
     removes parent id if no corresponding children.
 
     checks if any task possesses a given child id, and if not, finds
     the task with the corresponding parent id and removes that id.
     """
-    if not any(t.child_id == id for t in tasks):
+    if not any(t.child_id == id_num for t in tasks):
         for t in tasks:
-            if t.parent_id == id:
+            if t.parent_id == id_num:
                 t.parent_id = None
     return tasks
 
 
-def child_set(tasks, n, p):
+def child_set(tasks, num, parent):
     """make a task the child of another task."""
-    p = int(p) - 1
-    if tasks[p].parent_id is None:
-        tasks = parent_set(tasks, p)
-    tasks[n].child_id = tasks[p].parent_id
+    parent = int(parent) - 1
+    if tasks[parent].parent_id is None:
+        tasks = parent_set(tasks, parent)
+    tasks[num].child_id = tasks[parent].parent_id
     return tasks
 
 
-def child_unset(tasks, n):
+def child_unset(tasks, num):
     """remove child id from task, checks if parent childless"""
-    child_id = tasks[n].child_id
-    tasks[n].child_id = None
+    child_id = tasks[num].child_id
+    tasks[num].child_id = None
     tasks = parent_check_empty(tasks, child_id)
     return tasks
 
 
-def clean_orphans(tasks, id):
+def clean_orphans(tasks, id_num):
     """remove child id from al tasks"""
     for t in tasks:
-        if t.child_id == id:
+        if t.child_id == id_num:
             t.child_id = None
+    return tasks
 
 
-def contract(tasks, n):
+def contract(tasks, num):
     """set a task as contracted so its children are hidden in nest view"""
-    tasks[n].contracted = True
+    tasks[num].contracted = True
     return tasks
 
 
-def expand(tasks, n):
+def expand(tasks, num):
     """expand a contracted task so that its children show in nest view"""
-    tasks[n].contracted = True
+    tasks[num].contracted = True
     return tasks
 
 
-def future_set(tasks, n):
+def future_set(tasks, num):
     """remove due date such that task is treated as due indefinite future"""
-    tasks[n].due = None
+    tasks[num].due = None
     return tasks
 
 
-def order_after(tasks, n, p):
+def order_after(tasks, num, pivot):
     """place a task after another in the list"""
-    pivot_i = int(p)-1
-    if tasks[n].due != tasks[pivot_i].due:
+    pivot_i = int(pivot)-1
+    if tasks[num].due != tasks[pivot_i].due:
         print('Can\'t order tasks with different due dates against each other')
         return tasks
-    if pivot_i > n:
+    if pivot_i > num:
         pivot_i -= 1
-    moved = tasks.pop(n)
+    moved = tasks.pop(num)
     tasks.insert(pivot_i+1, moved)
     return tasks
 
 
-def order_before(tasks, n, p):
+def order_before(tasks, num, pivot):
     """place a task before another in the list"""
-    pivot_i = int(p)-1
-    if tasks[n].due != tasks[pivot_i].due:
+    pivot_i = int(pivot)-1
+    if tasks[num].due != tasks[pivot_i].due:
         print('Can\'t order tasks with different due dates against each other')
         return tasks
-    if pivot_i > n:
+    if pivot_i > num:
         pivot_i -= 1
-    moved = tasks.pop(n)
+    moved = tasks.pop(num)
     tasks.insert(pivot_i, moved)
     return tasks
 
 
-def repeat_unset(tasks, n):
+def repeat_unset(tasks, num):
     """remove the repeat tag from a task"""
-    tasks[n].repeat = None
+    tasks[num].repeat = None
     return tasks
 
 
-def repeat_set(tasks, n, s):
+def repeat_set(tasks, num, string):
     """set a task as repeating, specify repeat type and details in tag"""
-    t = tasks[n]
+    t = tasks[num]
     if t.added is None:
         t.added = datetime.date.today()
-    if re.match('a\d{1,2}$', s):
-        t.repeat = s
-    elif re.match('e\d{1,2}$', s):
-        t.repeat = s
+    if re.match(r'a\d{1,2}$', string):
+        t.repeat = string
+    elif re.match(r'e\d{1,2}$', string):
+        t.repeat = string
         if t.added is not None and t.due is not None:
             t.repeat = t.repeat + 'c' + str((t.due - t.added).days)
         else:
             t.repeat += 'c0'
-    elif re.match('[mtwrfsu]{1,7}', s):
-        t.repeat = ''.join(c for c in "mtwrfsu" if c in s)
+    elif re.match('[mtwrfsu]{1,7}', string):
+        t.repeat = ''.join(c for c in "mtwrfsu" if c in string)
     else:
         print('Error: Not a valid recur format')
     return tasks
 
 
-def repeat_recycle(tasks, n):
+def repeat_recycle(tasks, num):
     """on completion of repeating task, make new due date and update tag"""
-    t = tasks[n]
+    t = tasks[num]
     td = datetime.date.today()
 
     t_done = copy.deepcopy(t)

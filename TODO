@@ -1,14 +1,17 @@
 Refactoring
 -----------
 
-perhaps refactor to make a list object.
+refactor color application, perhaps to external func.
 make commands and args unconflict and clean up mess in assemble_action_command_list
 move edit command to task object, along with others specific to change
-refactor color application, perhaps to external func.
 refactor arg handingling functions so there's only one general one, simplify, be ruthless.
 docstrings
     utils
     main
+perhaps refactor to make a list object.
+sane defaults like not print ordering tags etc.
+refactor print method
+
 
 New Features
 ------------
@@ -17,7 +20,8 @@ next command
 undo function
 output on successful actions.
 automatically send to archive after two days
-
+add view command such that tdp enters sort of shell mode, with a command prompt, and every time a command is input the list is reprinted and another command prompt given.
+clearn orphaned children if no parents on startup.
 
 Pre-Release
 -----------
@@ -26,3 +30,4 @@ docs
 install setup
 ensure zsh completion is up to date
 autocomplete after + or @
+

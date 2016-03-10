@@ -73,14 +73,19 @@ def normal_print(tasks, color, trimmings):
 
 def nest_sort(tasks):
     """sort all children to be under their parents"""
-    nest_sorted = [t for t in tasks if not t.child_id]
+    parent_ids = [t.parent_id for t in tasks if t.parent_id is not None]
+    # checks for orphaned children due to invalid list or filtering
+    nest_sorted = [t for t in tasks if not t.child_id or
+                   t.child_id not in parent_ids]
     remaining = [t for t in tasks if t not in nest_sorted]
-    for i in range(len(tasks)):
+    i = 0
+    while len(remaining) > 0:
         if nest_sorted[i].parent_id:
             children = [t for t in remaining
                         if t.child_id == nest_sorted[i].parent_id]
             remaining = [t for t in remaining if t not in children]
             nest_sorted = nest_sorted[:i+1] + children + nest_sorted[i+1:]
+        i += 1
     return nest_sorted
 
 
@@ -89,8 +94,6 @@ def nest(tasks, color, trimmings):
 
     tasks = nest_sort(tasks)
     output_lines = []
-
-    # pretty indented print
     hierarchy = []
     closed_id = 0
     latest_parent_id = 0
@@ -98,6 +101,7 @@ def nest(tasks, color, trimmings):
         orphan = False
 
         # calc indent level based on degree of nested child tags
+        # manage nesting hierarchy
         indents = 0
         if t.child_id is not None:
             if t.child_id not in hierarchy:
@@ -115,6 +119,7 @@ def nest(tasks, color, trimmings):
             hierarchy = []
 
         # closed/open indicator, set switch to hide following tasks
+        # set last parent id
         if t.parent_id:
             latest_parent_id = t.parent_id
             if t.contracted:
@@ -130,8 +135,7 @@ def nest(tasks, color, trimmings):
             line = '   ' * indents + prefix + t.compose_line(color, trimmings)
             output_lines.append(line)
 
-    for l in output_lines:
-        print(l)
+    print('\n'.join(output_lines))
 
 
 def get_console_size():

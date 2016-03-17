@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""general utility functions that don't fit thematically elsewhere"""
 import datetime
 import re
 
@@ -7,17 +8,20 @@ weekdays = ['m', 't', 'w', 'r', 'f', 's', 'u']
 
 
 def projects_get(tasks):
+    """return list of all projects in list"""
     return sorted({p for t in tasks for p in t.projects},
                   key=lambda s: s.lower())
 
 
 def contexts_get(tasks):
+    """return list of all contexts in list"""
     return sorted({p for t in tasks for p in t.contexts},
                   key=lambda s: s.lower())
 
 
-def weekday_to_datetime(s):
-    daynum = weekdays.index(s)
+def weekday_to_datetime(string):
+    """convert a weekday code to datetime object"""
+    daynum = weekdays.index(string)
     offset = daynum - int(datetime.date.today().weekday())
     if offset < 1:
         offset += 7
@@ -26,6 +30,7 @@ def weekday_to_datetime(s):
 
 
 def date_to_datetime(s):
+    """converts to datetime a string in various formats"""
     date = None
     td = datetime.date.today()
     td = [td.year, td.month, td.day]
@@ -34,9 +39,9 @@ def date_to_datetime(s):
         month_lengths[1] = 29
     if re.match('\d{1,2}$', s):
         year, month, day = None, None, int(s)
-    elif re.match('\d{1,2}-\d{1,2}$', s):
+    elif re.match(r'\d{1,2}-\d{1,2}$', s):
         year, month, day = None, tuple([int(i) for i in s.split('-')])
-    elif re.match('\d{4}-\d{1,2}-\d{1,2}$', s):
+    elif re.match(r'\d{4}-\d{1,2}-\d{1,2}$', s):
         year, month, day = tuple([int(i) for i in s.split('-')])
 
     # increment month if day is lower than td
@@ -69,9 +74,29 @@ def code_to_datetime(s):
     if s[0] in weekdays:
         date = weekday_to_datetime(s)
     elif s[0] == 'n':
-        date = datetime.datoday()
+        date = datetime.date.today()
     elif s[0].isdigit():
         date = date_to_datetime(s)
     else:
         print('Error: Not a valid date format')
     return date
+
+
+def colorize(string, color):
+    colors = {
+        'red': 1,
+        'green': 2,
+        'yellow': 3,
+        'blue': 4,
+        'magenta': 13,
+        'cyan': 6,
+        'orange': 9,
+        'gray': 10,
+        'white': 14,
+        }
+    return '\x1b[38;5;{}m{}\x1b[0m'.format(colors[color], string)
+
+
+def string_to_datetime(string):
+    """convert dd-mm-yyyy string to datetime"""
+    return datetime.date(*map(int, string.split('-')))

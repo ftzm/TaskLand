@@ -114,8 +114,8 @@ action_commands = collections.OrderedDict([
     ('rm', (actions.remove, 0, 0)),
     ('do', (actions.complete, 0, 0)),
     ('undo', (actions.undo, 0, 0)),
-    ('s', (actions.schedule, 1, 1)),
-    ('us', (actions.unschedule, 0, 0)),
+    ('sc', (actions.schedule, 1, 1)),
+    ('usc', (actions.unschedule, 0, 0)),
     ('pr', (actions.prioritize, 1, 1)),
     ('upr', (actions.unprioritize, 0, 0)),
     ('c', (actions.set_context, 1, 9)),
@@ -126,10 +126,10 @@ action_commands = collections.OrderedDict([
     ('usub', (actions.child_unset, 0, 0)),
     ('cn', (actions.contract, 0, 0)),
     ('ex', (actions.expand, 0, 0)),
-    ('f', (actions.future_set, 0, 0)),
-    ('sb', (actions.order_before, 1, 1)),
-    ('sa', (actions.order_after, 1, 1)),
-    ('re', (actions.repeat_set, 1, 1)),
+    ('fut', (actions.future_set, 0, 0)),
+    ('setabove', (actions.order_before, 1, 1)),
+    ('setbelow', (actions.order_after, 1, 1)),
+    ('rep', (actions.repeat_set, 1, 1)),
     ('ure', (actions.repeat_unset, 0, 0)),
     ])
 
@@ -151,42 +151,12 @@ def assemble_view_command_list(args):
     return command_list
 
 
-def verify_view_command_list(command_list):
-    """check that list of view commands is valid"""
-    for command_args in command_list:
-        command, args = command_args
-        minimum = view_commands[command][1]
-        maximum = view_commands[command][2]
-        if len(args) < minimum:
-            if minimum != maximum:
-                print("Error: '{}' takes at least {} argument{plural}".format(
-                    command, minimum, plural='' if minimum == 1 else 's'))
-            else:
-                print("Error: '{}' takes {} argument{plural}".format(
-                    command, minimum, plural='' if minimum == 1 else 's'))
-            return False
-        elif len(args) > maximum:
-            surplus = args[maximum]
-            if minimum != maximum:
-                print("Error: '{}' takes at most {} argument{plural}, "
-                      "and '{}' is not a command".format(
-                          command, maximum, surplus,
-                          plural='' if maximum == 1 else 's'))
-            else:
-                print("Error: '{}' takes {} argument{plural} "
-                      "and '{}' is not a command".format(
-                          command, maximum, surplus,
-                          plural='' if maximum == 1 else 's'))
-            return False
-    return True
-
-
 def execute_view_command_list(command_list):
     """executes functions corresponding to view commands"""
     # establish print method
     print_command = views.normal_print
     color = True
-    trimmings = []
+    exlusions = []
     i = 0
     x = len(command_list)
     while i < x:
@@ -199,7 +169,7 @@ def execute_view_command_list(command_list):
             color = False
             x -= 1
         elif command_list[i][0] == 'trim':
-            trimmings = command_list.pop(i)[1]
+            exlusions = command_list.pop(i)[1]
             x -= 1
         else:
             i += 1
@@ -213,58 +183,29 @@ def execute_view_command_list(command_list):
         else:
             tasks = view_commands[command][0](tasks, *args)
 
-    print_command(tasks, color, trimmings)
+    print_command(tasks, color, exlusions)
 
 
 def handle_view_commands(args):
     command_list = assemble_view_command_list(args)
-    if verify_view_command_list(command_list):
+    if verify_command_list(command_list, view_commands, view_commands):
         execute_view_command_list(command_list)
 
 
-def assemble_action_command_list(args, target):
+def assemble_action_command_list(args):
     """parses list of strings into action commands and arguments"""
     command_list = []
     task_text = False
     i = 0
     while i < len(args):
         arg = args[i]
-        if task_text is False:
-            if arg in list(action_commands.keys()):
-                command_args = (arg, [])
-                command_list.append(command_args)
-                # set to grab task text if command is a
-                task_text = arg == 'a'
-                # manually grab args for some commands because they're
-                # also sometimes commands
-                if arg == 'p':
-                    i += 1
-                    if args[i].isdigit():
-                        command_list[-1][1].append(args[i])
-                        i += 1
-                    command_list[-1][1].append(args[i])
-                elif arg in ['s', 're']:
-                    i += 1
-                    if args[i].isdigit():
-                        command_list[-1][1].append(args[i])
-                        i += 1
-                        if target is not None:
-                            continue
-                    if args[i].isdigit or args[i] in utils.weekdays:
-                        command_list[-1][1].append(args[i])
-            else:
-                try:
-                    command_list[-1][1].append(arg)
-                except:
-                    print('{} is not a command'.format(arg))
+        if arg == ',':
+            task_text = False
+        elif task_text is False and arg in list(action_commands.keys()):
+            command_list.append((arg, []))
+            task_text = arg == 'a'
         else:
-            if arg == ',':
-                task_text = False
-            else:
-                try:
-                    command_list[-1][1].append(arg)
-                except:
-                    print('{} is not a command'.format(arg))
+            command_list[-1][1].append(arg)
         i += 1
     return command_list
 
@@ -283,36 +224,38 @@ def prepare_single_action(command_list):
     return command_list, target
 
 
-def verify_action_command_list(command_list):
-    """check that list of action commands is valid"""
+def verify_command_list(command_list, command_index, action_msg=False):
+    """check that list of commands is valid"""
+    if action_msg:
+        action_text = ", in addition to the target"
+    else:
+        action_text = ""
     for command_args in command_list:
         command, args = command_args
-        minimum = action_commands[command][1]
-        maximum = action_commands[command][2]
+        minimum = command_index[command][1]
+        maximum = command_index[command][2]
         if len(args) < minimum:
             if minimum != maximum:
                 print("Error: '{}' takes at least {} argument{pl} "
-                      "in addition to the target".format(
-                          command, minimum, pl='' if minimum == 1 else 's'))
+                      "{}".format(command, minimum, action_text,
+                                  pl='' if minimum == 1 else 's'))
             else:
-                print(command_list)
-                print("Error: '{}' takes {} argument{pl} "
-                      "in addition to the target".format(
-                          command, minimum, pl='' if minimum == 1 else 's'))
+                print("Error: '{}' takes {} argument{pl}"
+                      "{}".format(command, minimum, action_text,
+                                  pl='' if minimum == 1 else 's'))
             return False
         elif len(args) > maximum:
             surplus = args[maximum]
             if minimum != maximum:
-                print("Error: '{}' takes at most {} argument{pl} "
-                      "in addition to the target, and '{}' is not a "
+                print("Error: '{}' takes at most {} argument{pl}"
+                      "{}, and '{}' is not a "
                       "command".format(
-                          command, maximum, surplus,
+                          command, maximum, surplus, action_text,
                           pl='' if maximum == 1 else 's'))
             else:
-                print("Error: '{}' takes {} argument{pl} "
-                      "in addition to the target, and '{}' is not a "
-                      "command".format(
-                          command, maximum, surplus,
+                print("Error: '{}' takes {} argument{pl}"
+                      "{}, and '{}' is not a command".format(
+                          command, maximum, action_text, surplus,
                           pl='' if maximum == 1 else 's'))
             return False
     return True
@@ -329,10 +272,12 @@ def execute_action_command_list(command_list, target, lines):
 
 
 def get_action_target(args):
+    i = 0
     target = None
-    if args[0].isdigit():
-        target = int(args[0]) - 1
-        args = args[1:]
+    while i < len(args):
+        if args[i].isdigit():
+            target = int(args.pop(i)) - 1
+        i += 1
     return args, target
 
 
@@ -357,8 +302,9 @@ def handle_action_commands(args):
     # if first arg is an int, extract it as target
     args, target = get_action_target(args)
     # make command list out of args
-    command_list = assemble_action_command_list(args, target)
+    command_list = assemble_action_command_list(args)
     # get addition from command list if exists else none
+    print(command_list)
     command_list, addition = extract_task_addition(command_list)
 
     # if there's an addition, fail if also target, else add addition
@@ -387,7 +333,7 @@ def handle_action_commands(args):
               " {} tasks in list".format(target, len(tasks)))
         return
 
-    if verify_action_command_list(command_list):
+    if verify_command_list(command_list, action_commands, True):
         tasks = execute_action_command_list(command_list, target, tasks)
     write_tasks(tasks)
 

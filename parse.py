@@ -2,9 +2,8 @@
 """task class and functions for parsing lines as tasks"""
 
 import re
-import datetime
 import base62
-
+import utils
 
 x_re = re.compile('^(x)')
 pri_re = re.compile(r'^(\([A-Z]\))')
@@ -51,132 +50,119 @@ class Task(object):
         self.num = 0
         line, self.x = extract(line, x_re)
         line, self.priority = extract(line, pri_re)
-
-        line, self.added = extract(line, a_re)
-        if self.added is not None:
-            self.added = datetime.date(*map(int, self.added.split('-')))
-
-        line, dates = extract_all(line, date_re)
-        dates = [datetime.date(*map(int, d.split('-'))) for d in dates]
-        datenum = len(dates)
-        if datenum == 2:
-            self.done, self.due = dates[0], dates[1]
-        elif datenum == 1 and self.x is not None:
-            self.done, self.due = dates[0], None
-        elif datenum == 1:
-            self.done, self.due = None, dates[0]
-        else:
-            self.done, self.due = None, None
-        line, self.order = extract(line, o_re)
-
-        if self.order is not None:
-            try:
-                self.order = base62.decode(self.order)
-            except:
-                print('Error: corrupted order code')
-
-
+        line, self.child_id = extract(line, c_id_re)
+        line, self.repeat = extract(line, r_id_re)
         line, self.contexts = extract_all(line, c_re)
         line, self.projects = extract_all(line, p_re)
         line, self.parent_id = extract(line, p_id_re)
+        line, self.added = extract(line, a_re)
+        line, self.order = extract(line, o_re)
+        line, dates = extract_all(line, date_re)
+        self.text = line.strip()
+        self.done = None
+        self.due = None
+
+        if self.added is not None:
+            self.added = utils.string_to_datetime(self.added)
+
+        dates = [utils.string_to_datetime(d) for d in dates]
+        if len(dates) == 2:
+            self.done, self.due = dates[0], dates[1]
+        elif len(dates) == 1 and self.x is not None:
+            self.done = dates[0]
+        elif len(dates) == 1:
+            self.due = dates[0]
+
+        if self.order is not None:
+            self.order = base62.decode(self.order)
+
         if self.parent_id is not None and 'c' in self.parent_id:
             self.parent_id = self.parent_id[:-1]
             self.contracted = True
         else:
             self.contracted = False
-        line, self.child_id = extract(line, c_id_re)
-        line, self.repeat = extract(line, r_id_re)
-        self.text = line.strip()
 
+    @property
+    def num_string(self):
+        return '{:>3}'.format(self.num)
 
+    @property
+    def done_string(self):
+        return self.done.strftime('%Y-%m-%d') if self.done else None
 
-    def compose_parts(self, order, exclusions=None):
-        parts = ['n', 'x', 'pr', 'dn', 'd', 't', 'p', 'c',
-                 'r', 'a', 'o', 'p_id', 'c_id']
+    @property
+    def due_string(self):
+        return self.due.strftime('%Y-%m-%d') if self.due else None
 
-        if exclusions is not None:
-            parts = [p for p in parts if p not in exclusions]
+    @property
+    def added_string(self):
+        return self.added.strftime('A:%Y-%m-%d') if self.added else None
 
-        conversions = {
-            'n': '{:>3}'.format(self.num),
-            'x': self.x,
-            'pr': self.priority,
-            'dn': self.done.strftime('%Y-%m-%d') if self.done else None,
-            'd': self.due.strftime('%Y-%m-%d') if self.due else None,
-            'a': self.added.strftime('A:%Y-%m-%d') if self.added else None,
-            'o': 'O:{}'.format(base62.encode(order)),
-            'p': ' '.join(['+{}'.format(p) for p in self.projects])
-                 if self.projects else None,
-            'c': ' '.join(['@{}'.format(c) for c in self.contexts])
-                 if self.contexts else None,
-            'p_id': ''.join(['P:', self.parent_id, 'c' if self.contracted
-                             else '']) if self.parent_id else None,
-            'c_id': ''.join(['C:', self.child_id]) if self.child_id else None,
-            'r': ''.join(['R:', self.repeat]) if self.repeat else None,
-            't': self.text
-            }
+    @property
+    def order_string(self):
+        return 'O:{}'.format(base62.encode(self.num))
 
-        output = [(p, conversions[p]) for p in parts]
-
+    @property
+    def projects_string(self):
+        output = None
+        if self.projects:
+            output = ' '.join(['+{}'.format(p) for p in self.projects])
         return output
 
-    def colorize(self, string, color):
-        colors = {
-            'red': 1,
-            'green': 2,
-            'yellow': 3,
-            'blue': 4,
-            'magenta': 13,
-            'cyan': 6,
-            'orange': 9,
-            'gray': 10,
-            'white': 14,
-            }
-        return '\x1b[38;5;{}m{}\x1b[0m'.format(colors[color], string)
-
-    def colorize_parts(self, parts):
-        color_prefix = '\x1b[38;5;{}m'
-        unset = '\x1b[0m'
-        red = color_prefix.format(1)
-        green = color_prefix.format(2)
-        yellow = color_prefix.format(3)
-        blue = color_prefix.format(4)
-        magenta = color_prefix.format(13)
-        cyan = color_prefix.format(6)
-        orange = color_prefix.format(9)
-        gray = color_prefix.format(10)
-        white = color_prefix.format(14)
-        # background = '\x1b[48;5;18m'
-
-        pc = {
-            'n': gray,
-            'x': gray,
-            'pr': red,
-            'f': cyan,
-            'dn': gray,
-            'd': orange,
-            'a': green,
-            'o': gray,
-            'p': blue,
-            'c': yellow,
-            'p_id': gray,
-            'c_id': gray,
-            'r': magenta,
-            't': white,
-            }
-
-        output = []
-        for p in parts:
-            if p[1] is not None:
-                output.append((p[0], '{}{}{}'.format(pc[p[0]], p[1], unset)))
-
+    @property
+    def contexts_string(self):
+        output = None
+        if self.contexts:
+            output = ' '.join(['@{}'.format(p) for p in self.contexts])
         return output
 
-    def compose_line(self, color=True, exclusions=None, order=None):
-        if not order:
-            order = self.num
-        parts = self.compose_parts(order, exclusions)
+    @property
+    def parent_id_string(self):
+        output = None
+        if self.parent_id:
+            output = ''.join(['P:', self.parent_id,
+                              'c' if self.contracted else ''])
+        return output
+
+    @property
+    def child_id_string(self):
+        output = None
+        if self.child_id:
+            output = ''.join(['C:', self.child_id,
+                              'c' if self.contracted else ''])
+        return output
+
+    @property
+    def repeat_string(self):
+        output = None
+        if self.repeat:
+            output = ''.join(['R:', self.repeat])
+        return output
+
+    def compose_line(self, color=True, exclusions=None, reorder=None):
+        """convert task object into a string for display or writing"""
+
+        self.num = reorder or self.num
+
+        parts = [
+            ('n', 'gray', self.num_string),
+            ('x', 'gray', self.x),
+            ('pr', 'red', self.priority),
+            ('dn', 'gray', self.done_string),
+            ('d', 'orange', self.due_string),
+            ('t', 'white', self.text),
+            ('p', 'blue', self.projects_string),
+            ('c', 'yellow', self.contexts_string),
+            ('r', 'magenta', self.repeat_string),
+            ('a', 'green', self.added_string),
+            ('o', 'gray', self.order_string),
+            ('p_id', 'gray', self.parent_id_string),
+            ('c_id', 'gray', self.child_id_string),
+            ]
+
         if color:
-            parts = self.colorize_parts(parts)
-        line = ' '.join([p[1] for p in parts if p[1] is not None])
-        return line
+            parts = [utils.colorize(s, c) for l, c, s in parts
+                     if l not in exclusions and s]
+        else:
+            parts = [s for l, c, s in parts if l not in exclusions and s]
+        return ' '.join(parts)

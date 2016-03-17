@@ -65,10 +65,10 @@ def view_week(tasks):
     return view_until(tasks, datetime.date.today()+datetime.timedelta(7))
 
 
-def normal_print(tasks, color, trimmings):
+def normal_print(tasks, color, exclusions):
     """print tasks using basic print method"""
     for t in tasks:
-        print(t.compose_line(color, trimmings))
+        print(t.compose_line(color, exclusions))
 
 
 def nest_sort(tasks):

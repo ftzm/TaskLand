@@ -55,6 +55,11 @@ def view_until_cli(tasks, string):
     return view_until(tasks, date)
 
 
+def view_next(tasks):
+    """return the next task in the """
+    return [tasks[0]] if tasks else []
+
+
 def view_today(tasks):
     """return list of tasks that are due up until today"""
     return view_until(tasks, datetime.date.today())
@@ -63,6 +68,12 @@ def view_today(tasks):
 def view_week(tasks):
     """view tasks due within the coming week"""
     return view_until(tasks, datetime.date.today()+datetime.timedelta(7))
+
+
+def view_reversed(tasks):
+    """reverse order of tasks"""
+    tasks.reverse()
+    return tasks
 
 
 def normal_print(tasks, color, exclusions):

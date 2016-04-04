@@ -70,19 +70,21 @@ def date_to_datetime(s):
     return date
 
 
-def code_to_datetime(s):
-    if s[0] in weekdays:
-        date = weekday_to_datetime(s)
-    elif s[0] == 'n':
+def code_to_datetime(string):
+    """interpret the code used with scheduling commands as a datetime object"""
+    if string[0] in weekdays:
+        date = weekday_to_datetime(string)
+    elif string[0] == 'n':
         date = datetime.date.today()
-    elif s[0].isdigit():
-        date = date_to_datetime(s)
+    elif string[0].isdigit():
+        date = date_to_datetime(string)
     else:
         print('Error: Not a valid date format')
     return date
 
 
 def colorize(string, color):
+    """surround a string with terminal color codes"""
     colors = {
         'red': 1,
         'green': 2,

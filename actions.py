@@ -57,8 +57,10 @@ def complete(tasks, num):
     return tasks
 
 
-def undo(tasks):
-    """unmark a task as completed, yet to be implemented"""
+def undo(tasks, num):
+    """unmark a task as completed"""
+    tasks[num].x = ''
+    tasks[num].done = None
     return tasks
 
 
@@ -91,9 +93,11 @@ def unprioritize(tasks, num):
     return tasks
 
 
-def set_context(tasks, num, context):
-    """add a context to a task"""
-    tasks[num].contexts.append(context)
+def set_context(tasks, num, *contexts):
+    """add contexts to a task"""
+    for context in contexts:
+        if context not in tasks[num].contexts:
+            tasks[num].contexts.append(context)
     return tasks
 
 
@@ -103,9 +107,11 @@ def unset_context(tasks, num, i):
     return tasks
 
 
-def set_project(tasks, num, project):
+def set_project(tasks, num, *projects):
     """add a project to a task"""
-    tasks[num].projects.append(project)
+    for project in projects:
+        if project not in tasks[num].projects:
+            tasks[num].projects.append(project)
     return tasks
 
 
@@ -170,7 +176,7 @@ def child_unset(tasks, num):
 
 
 def clean_orphans(tasks, id_num):
-    """remove child id from al tasks"""
+    """remove child id from all tasks"""
     for t in tasks:
         if t.child_id == id_num:
             t.child_id = None

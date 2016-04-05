@@ -19,29 +19,32 @@ def view_by_context(tasks):
             if p in t.contexts]
 
 
-def filter_contexts(tasks, *strings):
+def filter_contexts(tasks, strings):
     """return list of tasks whose contexts contain any of supplied strings"""
-    return [t for t in tasks if any(s in t.contexts for s in strings)]
+    return [t for t in tasks if
+            any(s in t.contexts for s in strings.split(' '))]
 
 
-def filter_projects(tasks, *strings):
+def filter_projects(tasks, strings):
     """return list of tasks whose projects contian any of supplied strings"""
-    return [t for t in tasks if any(s in t.projects for s in strings)]
+    return [t for t in tasks if
+            any(s in t.projects for s in strings.split(' '))]
 
 
-def filter_include_any(tasks, *strings):
+def filter_include_any(tasks, strings):
     """return list of tasks whose text include any of supplied strings"""
-    return [t for t in tasks if any(s in t.text for s in strings)]
+    return [t for t in tasks if any(s in t.text for s in strings.split(' '))]
 
 
-def filter_include_all(tasks, *strings):
+def filter_include_all(tasks, strings):
     """return list of tasks whose text include all of supplied strings"""
-    return [t for t in tasks if all(s in t.text for s in strings)]
+    return [t for t in tasks if all(s in t.text for s in strings.split(' '))]
 
 
-def filter_exclude(tasks, *strings):
+def filter_exclude(tasks, strings):
     """return list of tasks whose text include none of supplied strings"""
-    return [t for t in tasks if not any(s in t.text for s in strings)]
+    return [t for t in tasks if not
+            any(s in t.text for s in strings.split(' '))]
 
 
 def view_until(tasks, date):

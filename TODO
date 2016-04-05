@@ -1,25 +1,15 @@
 Refactoring
 -----------
 
-pp and pp to view commands
-
 New Features
 ------------
 
-add view command such that tdp enters sort of shell mode, with a command prompt, and every time a command is input the list is reprinted and another command prompt given.
-option to not archive automatically
-a command to archive all done manually
 
 Pre-Release
 -----------
 
 docs
-install setup
 ensure zsh completion is up to date
 autocomplete after + or @
-
-
-command dict to list
-color codes into list
-output color codes in place of label, feed that to colorize
-
+bash completion
+install setup

@@ -108,7 +108,7 @@ def write_tasks(tasks):
 def archive_done(tasks, delay):
     """remove tasks marked done from the task list and write to archive file"""
     to_go = [t for t in tasks if t.done and datetime.date.today() >=
-             t.done + delay]
+             t.done + datetime.timedelta(delay)]
     to_stay = [t for t in tasks if t not in to_go]
     to_go_lines = [t.compose_line(False, ['n']) for t in to_go]
     with open(settings['archive_location'], "a") as f:
@@ -133,52 +133,52 @@ def shellmode(args):
             handle_action_commands(commands.split(' '))
 
 view_commands = collections.OrderedDict([
-    ('bc', (views.view_by_context, 0, 0)),
-    ('bp', (views.view_by_project, 0, 0)),
-    ('vc', (views.filter_contexts, 1, 9)),
-    ('vp', (views.filter_projects, 1, 9)),
-    ('any', (views.filter_include_all, 1, 9)),
-    ('all', (views.filter_include_any, 1, 9)),
-    ('excl', (views.filter_exclude, 1, 9)),
-    ('next', (views.view_next, 0, 0)),
-    ('today', (views.view_today, 0, 0)),
-    ('week', (views.view_week, 0, 0)),
-    ('until', (views.view_until_cli, 1, 1)),
-    ('reverse', (views.view_reversed, 0, 0)),
-    ('hide', ('hide', 1, 9)),
-    ('nocolor', ('nocolor', 0, 0)),
-    ('nest', (views.nest, 0, 0)),
-    ('h', (views.date_headers, 0, 0)),
+    ('bc', (views.view_by_context, False)),
+    ('bp', (views.view_by_project, False)),
+    ('vc', (views.filter_contexts, True)),
+    ('vp', (views.filter_projects, True)),
+    ('any', (views.filter_include_any, True)),
+    ('all', (views.filter_include_all, True)),
+    ('excl', (views.filter_exclude, True)),
+    ('next', (views.view_next, False)),
+    ('today', (views.view_today, False)),
+    ('week', (views.view_week, False)),
+    ('until', (views.view_until_cli, True)),
+    ('reverse', (views.view_reversed, False)),
+    ('hide', ('hide', True)),
+    ('nocolor', ('nocolor', False)),
+    ('nest', (views.nest, False)),
+    ('h', (views.date_headers, False)),
     ])
 
 action_commands = collections.OrderedDict([
-    ('add', (actions.add, 1, 100)),  # 'a' has numbers for show atm
-    ('edit', (actions.edit, 0, 0)),
-    ('rm', (actions.remove, 0, 0)),
-    ('do', (actions.complete, 0, 0)),
-    ('undo', (actions.undo, 0, 0)),
-    ('sc', (actions.schedule, 1, 1)),
-    ('usc', (actions.unschedule, 0, 0)),
-    ('pr', (actions.prioritize, 1, 1)),
-    ('upr', (actions.unprioritize, 0, 0)),
-    ('c', (actions.set_context, 1, 9)),
-    ('uc', (actions.unset_context, 1, 1)),
-    ('p', (actions.set_project, 1, 9)),
-    ('up', (actions.unset_project, 1, 1)),
-    ('sub', (actions.child_set, 1, 1)),
-    ('usub', (actions.child_unset, 0, 0)),
-    ('con', (actions.contract, 0, 0)),
-    ('exp', (actions.expand, 0, 0)),
-    ('fut', (actions.future_set, 0, 0)),
-    ('setabove', (actions.order_before, 1, 1)),
-    ('setbelow', (actions.order_after, 1, 1)),
-    ('rep', (actions.repeat_set, 1, 1)),
-    ('urep', (actions.repeat_unset, 0, 0)),
+    ('add', (actions.add, True)),  # 'a' has numbers for show atm
+    ('edit', (actions.edit, False)),
+    ('rm', (actions.remove, False)),
+    ('do', (actions.complete, False)),
+    ('undo', (actions.undo, False)),
+    ('sc', (actions.schedule, True)),
+    ('usc', (actions.unschedule, False)),
+    ('pr', (actions.prioritize, True)),
+    ('upr', (actions.unprioritize, False)),
+    ('c', (actions.set_context, True)),
+    ('uc', (actions.unset_context, True)),
+    ('p', (actions.set_project, True)),
+    ('up', (actions.unset_project, True)),
+    ('sub', (actions.child_set, True)),
+    ('usub', (actions.child_unset, False)),
+    ('con', (actions.contract, False)),
+    ('exp', (actions.expand, False)),
+    ('fut', (actions.future_set, False)),
+    ('setabove', (actions.order_before, True)),
+    ('setbelow', (actions.order_after, True)),
+    ('rep', (actions.repeat_set, True)),
+    ('urep', (actions.repeat_unset, False)),
     ])
 
 general_commands = collections.OrderedDict([
     ('catch', (actions.catch)),
-    ('archive', (archive_done)),
+    ('archive', (archive_all)),
     ])
 
 
@@ -188,37 +188,22 @@ def assemble_view_command_list(args):
     is a task-list command and the second is a list of its arguments
     """
     # bring in default view commands in config
-    args += settings['default_view'].split(' ')
+    args += settings['default_view'].split(',')
 
     command_list = []
-    for arg in args:
-        if arg in view_commands.keys():
-            command_args = (arg, [])
-            command_list.append(command_args)
-        else:
-            command_list[-1][1].append(arg)
+    while args:
+        arg = args.pop(0)
+        try:
+            _, takes_arg = view_commands[arg]
+            if takes_arg:
+                command_arg = args.pop(0)
+            else:
+                command_arg = None
+            command_list.append((arg, [command_arg]))
+        except KeyError:
+            sys.exit("{} is not a command."
+                     "Is a previous command missing an argument?".format(arg))
     command_list.sort(key=lambda x: list(view_commands.keys()).index(x[0]))
-    return command_list
-
-
-def assemble_action_command_list(args):
-    """parses list of cli arg strings into action commands and arguments"""
-    command_list = []
-    task_text = False
-    i = 0
-    while i < len(args):
-        arg = args[i]
-        if arg == ',':
-            task_text = False
-        elif task_text is False and arg in list(action_commands.keys()):
-            command_list.append((arg, []))
-            task_text = arg == 'a'
-        else:
-            try:
-                command_list[-1][1].append(arg)
-            except IndexError:
-                print("Error: {} is not a command".format(arg))
-        i += 1
     return command_list
 
 
@@ -241,19 +226,19 @@ def execute_view_command_list(command_list):
             color = False
             x -= 1
         elif command_list[i][0] == 'hide':
-            exclusions = exclusions + command_list.pop(i)[1]
+            exclusions = exclusions + command_list.pop(i)[1][0].split(' ')
             x -= 1
         else:
             i += 1
 
     tasks = collect_tasks()
 
-    for command_args in command_list:
-        command, args = command_args
-        if not args:
-            tasks = view_commands[command][0](tasks)
-        else:
+    for command, args in command_list:
+        has_args = view_commands[command][1]
+        if has_args:
             tasks = view_commands[command][0](tasks, *args)
+        else:
+            tasks = view_commands[command][0](tasks)
 
     print_command(tasks, color, exclusions)
 
@@ -263,99 +248,78 @@ def handle_view_commands(args):
     command coordinating collecting, verifying and executing view commands
     """
     command_list = assemble_view_command_list(args)
-    if verify_command_list(command_list, view_commands, view_commands):
-        execute_view_command_list(command_list)
+    execute_view_command_list(command_list)
 
 
-def verify_command_list(command_list, command_index, action_msg=False):
-    """check that list of commands is valid"""
-    if action_msg:
-        action_text = ", in addition to the target"
-    else:
-        action_text = ""
-    for command_args in command_list:
-        command, args = command_args
-        minimum = command_index[command][1]
-        maximum = command_index[command][2]
-        if len(args) < minimum:
-            if minimum != maximum:
-                print("Error: '{}' takes at least {} argument{pl} "
-                      "{}".format(command, minimum, action_text,
-                                  pl='' if minimum == 1 else 's'))
-            else:
-                print("Error: '{}' takes {} argument{pl}"
-                      "{}".format(command, minimum, action_text,
-                                  pl='' if minimum == 1 else 's'))
-            return False
-        elif len(args) > maximum:
-            surplus = args[maximum]
-            if minimum != maximum:
-                print("Error: '{}' takes at most {} argument{pl}"
-                      "{}, and '{}' is not a "
-                      "command".format(
-                          command, maximum, surplus, action_text,
-                          pl='' if maximum == 1 else 's'))
-            else:
-                print("Error: '{}' takes {} argument{pl}"
-                      "{}, and '{}' is not a command".format(
-                          command, maximum, action_text, surplus,
-                          pl='' if maximum == 1 else 's'))
-            return False
-    return True
+def extract_addition(args):
+    text = []
+    while args:
+        arg = args.pop(0)
+        if arg != ',':
+            text.append(arg)
+        else:
+            break
+    return args, ' '.join(text)
+
+
+def assemble_action_command_list(args):
+    """parses list of cli arg strings into action commands and arguments"""
+    command_list = []
+    addition = None
+    target = None
+
+    # pop first element off as target if is digit
+    if args[0].isdigit():
+        target = int(args.pop(0)) - 1
+        print(target)
+
+    # assemble command list
+    while args:
+        arg = args.pop(0)
+        if arg == "add":
+            args, addition = extract_addition(args)
+        else:
+            try:
+                _, takes_arg = action_commands[arg]
+                if takes_arg:
+                    try:
+                        command_arg = args.pop(0)
+                    except IndexError:
+                        sys.exit("Error: command '{}' takes an argument"
+                                 .format(arg))
+                else:
+                    command_arg = None
+                command_list.append((arg, [command_arg]))
+            except KeyError:
+                command_list[-1][1].append(arg)
+
+    # verify number of arguments, extract target if applicable
+    for command, args in command_list:
+        if len(args) != action_commands[command][1]:
+            if target is None and addition is None and args[0].isdigit():
+                target = int(args.pop(0)) - 1
+            if len(args) != action_commands[command][1]:
+                sys.exit("Error: command '{}' has too many arguments: {}"
+                         .format(command, ', '.join(args)))
+
+    return command_list, addition, target
 
 
 def execute_action_command_list(command_list, target, lines):
     """executes the commands in a command list with args, returns result"""
-    for command_args in command_list:
-        command, args = command_args
-        if not args:
+    for command, args in command_list:
+        has_args = action_commands[command][1]
+        if not has_args:
             lines = action_commands[command][0](lines, target)
         else:
             lines = action_commands[command][0](lines, target, *args)
     return lines
 
 
-def get_action_target(args):
-    """find the first digit among the args, it invariably being the target"""
-    i = 0
-    target = None
-    while i < len(args):
-        if args[i].isdigit():
-            target = int(args.pop(i)) - 1
-            break
-        i += 1
-    return args, target
-
-
-def extract_task_addition(command_list):
-    """
-    looks for the command to add a task. if found, pops it and its args
-    from the command list, joins the args two one task-text string (addition),
-    and returns the command list and task-text
-    """
-    addition = None
-    i = 0
-    remaining = len(command_list)
-    while i < remaining:
-        command, args = command_list[i]
-        if command == 'a':
-            addition = ' '.join(args)
-            command_list.pop(i)
-            break
-        i += 1
-    return command_list, addition
-
-
 def handle_action_commands(args):
     """coordinates receiving, parsing, executing action commands"""
     tasks = collect_tasks()
-
-    # if first arg is an int, extract it as target
-    args, target = get_action_target(args)
-    # make command list out of args
-    command_list = assemble_action_command_list(args)
-    # get addition from command list if exists else none
-    command_list, addition = extract_task_addition(command_list)
+    command_list, addition, target = assemble_action_command_list(args)
 
     # if there's an addition, fail if also target, else add addition
     # and make it the target
@@ -380,8 +344,7 @@ def handle_action_commands(args):
               " {} tasks in list".format(target, len(tasks)))
         return
 
-    if verify_command_list(command_list, action_commands, True):
-        tasks = execute_action_command_list(command_list, target, tasks)
+    tasks = execute_action_command_list(command_list, target, tasks)
     write_tasks(tasks)
 
 

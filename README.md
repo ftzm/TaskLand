@@ -1,8 +1,6 @@
 #TaskLand
 
-Taskland is a Python-based, command-line application to manage tasks. It aims to capture the whole landscape of your productivity--in other words, your tasks for today, next week, and at the last stage of a months-long project.
-
-Advanced scheduling, flexible prioritization, and multiple view-modes make it easy to focus on current tasks while keeping organizing for future work.
+Taskland is a Python-based, command-line application to manage tasks. It aims to capture the whole landscape of your productivity--in other words, your tasks for today, next week, and at the last stage of a months-long project. Advanced scheduling, flexible prioritization, and multiple view-modes make it easy to focus on current tasks while keeping future work organized.
 
 ## Features
 
@@ -24,41 +22,42 @@ Taskland sports the following features, among others:
 - simply clone the folder into the directory of your choice.
 - cd into the folder, and run "chmod +x taskland.py"
 
-At this point you can run the application using the absolute path, but it is recommended to set up an alias. Something short like 't' make running the application very convenient.
+At this point you can run the application using the absolute path, but it is recommended to set up an alias. Something short like `t` make running the application very convenient.
 
 Setting up an alias in Bash:
 
 1. Add the following line anywhere in your .bashrc:
-
+```bash
 alias t="/path/to/your/taskland.py"
-j
+```
 2. Reload your .bashrc by running the following command:
-
+```bash
 . ~/.bashrc
-
+```
 Setting up an alias in Zsh:
 
 1. Add the following line anywhere in your .zshrc
-
+```bash
 alias t=/path/to/your/taskland.py
+```
 2. Reload your .zshrc by running the following command:
-j
+```bash
 . ~/.zshrc
-
+```
 TaskLand also includes an autocompletion script for Zsh. This will suggest commands as well as projects and contexts already used in the list. To install:
 
 1. Copy taskland_completion_zsh.sh to /home/youruser/.zsh/completions
 2. Rename the file to _taskland
 3. edit _taskland such that the path in the second line points to your taskland.py
 4. add the following lines to your .zshrc:
-
+```bash
 fpath = (~/.zsh/completions $fpath) # only add this is not already present
-
 compdef _taskland /path/to/your/taskland.py:taskland
+```
 5. run the following line:
-
+```bash
 . ~/.zshrc; autoload -U compinit && compinit; rehash
-
+```
 ## Usage
 
 ### Giving Commands
@@ -95,46 +94,46 @@ Only show those tasks that possess all the contexts given after 'vc'.
 #### vp - filter by projects
 Only show those tasks that possess all the projects given after 'vp'.
 
-#### any - filter by any of the provided words
+#### any - filter by any word
 Only show tasks that contain at least one of the provided words.
 
-#### all - filter by all of the provided strings
+#### all - filter by all words
 Only show tasks that contain all of the provided strings.
 
-#### excl - filter out tasks with the provided strings
+#### excl - exclude words
 Only show tasks that do not contain any of the provided string.
 
-#### next
+#### next - show next task
 Show the next task to be completed.
 
-#### today
+#### today 
 Show tasks due today or previously.
 
 #### week
 Show tasks due this week.
 
-#### until
+#### until - show tasks due until a date
 View tasks that are due up to and including the specified date. Use the date code specified [here](#Date Code)
 
-#### reverse
+#### reverse - show tasks in reverse
 Print the tasks in reverse order. Useful if your task list is so long it doesn't fit into the terminal screen.
 
-#### hide
+#### hide - hide some parts of tasks
 Hide components of the task line. Components are denoted with the following codes:
 
-n = the task number
-x = the 'x' of finished tasks
-pr =  the task priority
-dn = the date a task was done
-d = the date a task is (was) due
-t = the task text
-p = the task's projects
-c = the task's contexts
-r = the task's repitition tag
-a = the tag showing when the task was added
-o = the ordering tag (hidden by default)
-p_id = the tag assigned to a task which is a parent in nested mode (hidden by default)
-c_id = the tag assigned to a task which is a child in nested mode (hidden by default)
+- n = the task number
+- x = the 'x' of finished tasks
+- pr =  the task priority
+- dn = the date a task was done
+- d = the date a task is (was) due
+- t = the task text
+- p = the task's projects
+- c = the task's contexts
+- r = the task's repitition tag
+- a = the tag showing when the task was added
+- o = the ordering tag (hidden by default)
+- p_id = the tag assigned to a task which is a parent in nested mode (hidden by default)
+- c_id = the tag assigned to a task which is a child in nested mode (hidden by default)
 
 #### nocolor
 As the name suggests, prints tasks without colorization.
@@ -231,9 +230,6 @@ dates can be provded in the following formats:
 * DD - The next occurence of that day of the month, be it the current or following month.
 * MM-DD - Specify both the day and the month.
 * YYYY-MM-DD - Specify full date.
-
-
-archived tasks
 
 ## Settings
 

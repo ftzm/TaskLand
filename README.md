@@ -7,36 +7,42 @@ Advanced scheduling, flexible prioritization, and multiple view-modes make it ea
 ## Features
 
 Taskland sports the following features, among others:
--projects
--contexts
--task scheduling
--flexible task repition
--subtasks
--colorized output
--view by any date range
--filter by task text, project, context
--Zsh autocompletion
--Compatible with Todo.txt
+
+- projects
+- contexts
+- task scheduling
+- flexible task repition
+- subtasks
+- colorized output
+- view by any date range
+- filter by task text, project, context
+- Zsh autocompletion
+- Compatible with Todo.txt
 
 ## Installation
 
--simply clone the folder into the directory of your choice.
--cd into the folder, and run "chmod +x taskland.py"
+- simply clone the folder into the directory of your choice.
+- cd into the folder, and run "chmod +x taskland.py"
 
 At this point you can run the application using the absolute path, but it is recommended to set up an alias. Something short like 't' make running the application very convenient.
 
 Setting up an alias in Bash:
 
 1. Add the following line anywhere in your .bashrc:
+
 alias t="/path/to/your/taskland.py"
+j
 2. Reload your .bashrc by running the following command:
+
 . ~/.bashrc
 
 Setting up an alias in Zsh:
 
 1. Add the following line anywhere in your .zshrc
+
 alias t=/path/to/your/taskland.py
 2. Reload your .zshrc by running the following command:
+j
 . ~/.zshrc
 
 TaskLand also includes an autocompletion script for Zsh. This will suggest commands as well as projects and contexts already used in the list. To install:
@@ -45,9 +51,12 @@ TaskLand also includes an autocompletion script for Zsh. This will suggest comma
 2. Rename the file to _taskland
 3. edit _taskland such that the path in the second line points to your taskland.py
 4. add the following lines to your .zshrc:
+
 fpath = (~/.zsh/completions $fpath) # only add this is not already present
+
 compdef _taskland /path/to/your/taskland.py:taskland
 5. run the following line:
+
 . ~/.zshrc; autoload -U compinit && compinit; rehash
 
 ## Usage
@@ -211,19 +220,17 @@ Remove a repition tag from a task.
 #### Date Code
 dates can be provded in the following formats:
 
-m - Monday
-t - Tuesday
-w - Wednesday
-r - Thursday
-f - Friday
-s - Saturday
-u - Sunday
-
-n - today ('n' for now)
-
-DD - The next occurence of that day of the month, be it the current or following month.
-MM-DD - Specify both the day and the month.
-YYYY-MM-DD - Specify full date.
+* m - Monday
+* t - Tuesday
+* w - Wednesday
+* r - Thursday
+* f - Friday
+* s - Saturday
+* u - Sunday
+* n - today ('n' for now)
+* DD - The next occurence of that day of the month, be it the current or following month.
+* MM-DD - Specify both the day and the month.
+* YYYY-MM-DD - Specify full date.
 
 
 archived tasks

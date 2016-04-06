@@ -161,9 +161,7 @@ def date_headers(tasks, color, trimmings):
     """print lines with date headers"""
     previous_title = ''
     for t in tasks:
-        if t.priority is not None:
-            title = 'Prioritized'
-        elif t.x is not None:
+        if t.x is not None:
             title = 'Finished'
         elif t.due:
             if t.due == datetime.date.today():

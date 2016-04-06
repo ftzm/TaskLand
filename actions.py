@@ -1,5 +1,6 @@
 #!/usr/bin/python
 """functions for making changes to a tasks or the task list"""
+import sys
 import datetime
 import readline
 import re
@@ -103,7 +104,10 @@ def set_context(tasks, num, *contexts):
 
 def unset_context(tasks, num, i):
     """remove the n context from a task"""
-    tasks[num].contexts.pop(i-1)
+    try:
+        tasks[num].contexts.pop(i-1)
+    except IndexError:
+        sys.exit("Error: invalid context number")
     return tasks
 
 
@@ -117,7 +121,10 @@ def set_project(tasks, num, *projects):
 
 def unset_project(tasks, num, i=1):
     """remove a project from a task"""
-    tasks[num].projects.pop(int(i)-1)
+    try:
+        tasks[num].projects.pop(int(i)-1)
+    except IndexError:
+        sys.exit("Error: invalid project number")
     return tasks
 
 
@@ -192,12 +199,6 @@ def contract(tasks, num):
 def expand(tasks, num):
     """expand a contracted task so that its children show in nest view"""
     tasks[num].contracted = True
-    return tasks
-
-
-def future_set(tasks, num):
-    """remove due date such that task is treated as due indefinite future"""
-    tasks[num].due = None
     return tasks
 
 
@@ -299,12 +300,11 @@ def repeat_recycle(tasks, num):
 def catch(tasks):
     """iterate over all tasks due before today and ask for new duedate"""
     for i, t in enumerate(tasks):
-        if t.due < datetime.date.today() and \
-                t.x is None and t.due is not None:
+        if t.due and t.due < datetime.date.today() and t.x is None:
             sched = input('{}\nNew due date (blank for future): '.format(
                 t.text))
             if sched == '':
-                tasks = future_set(tasks, i)
+                tasks = unschedule(tasks, i)
             else:
                 t.due = utils.code_to_datetime(sched)
     return tasks

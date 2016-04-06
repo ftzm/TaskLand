@@ -1,8 +1,15 @@
 Refactoring
 -----------
 
+remove prioritize header
+separate out command building func
+separate processing of view options
+handle sit where too few args are given
+
 New Features
 ------------
+
+options with commands to run on a new task
 
 
 Pre-Release

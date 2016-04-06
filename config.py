@@ -3,6 +3,12 @@
 import os
 
 
+def separate(string):
+    parts = string.split('"')
+    print(parts)
+    return ''.join([p.strip() for p in parts if p != ''])
+
+
 def dict2lines(fromdict):
     """return dictionary as list of 'key=value' strings"""
     return ["{}={}\n".format(k, v) for k, v in fromdict.items()]
@@ -19,6 +25,8 @@ def parse(lines, sets_dict):
     for line in lines:
         try:
             key, value = line.split("=", 1)
+            value = ','.join([p.strip() for p in value.split('"')
+                              if p.strip()])
         except:
             continue
         if key in list(sets_dict.keys()) and value is not None:

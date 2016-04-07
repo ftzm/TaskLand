@@ -24,37 +24,38 @@ Taskland sports the following features, among others:
 
 At this point you can run the application using the absolute path, but it is recommended to set up an alias. Something short like `t` make running the application very convenient.
 
-Setting up an alias in Bash:
+#### Setting up an alias in Bash:
 
-1. Add the following line anywhere in your .bashrc:
+- Add the following line anywhere in your .bashrc:
 ```bash
 alias t="/path/to/your/taskland.py"
 ```
-2. Reload your .bashrc by running the following command:
+- Reload your .bashrc by running the following command:
 ```bash
 . ~/.bashrc
 ```
-Setting up an alias in Zsh:
+#### Setting up an alias in Zsh:
 
-1. Add the following line anywhere in your .zshrc
+- Add the following line anywhere in your .zshrc
 ```bash
 alias t=/path/to/your/taskland.py
 ```
-2. Reload your .zshrc by running the following command:
+- Reload your .zshrc by running the following command:
 ```bash
 . ~/.zshrc
 ```
+#### Setting up Autosuggestion in Zsh
 TaskLand also includes an autocompletion script for Zsh. This will suggest commands as well as projects and contexts already used in the list. To install:
 
-1. Copy taskland_completion_zsh.sh to /home/youruser/.zsh/completions
-2. Rename the file to _taskland
-3. edit _taskland such that the path in the second line points to your taskland.py
-4. add the following lines to your .zshrc:
+- Copy taskland_completion_zsh.sh to /home/youruser/.zsh/completions
+- Rename the file to _taskland
+- edit _taskland such that the path in the second line points to your taskland.py
+- add the following lines to your .zshrc:
 ```bash
 fpath = (~/.zsh/completions $fpath) # only add this is not already present
 compdef _taskland /path/to/your/taskland.py:taskland
 ```
-5. run the following line:
+- run the following line:
 ```bash
 . ~/.zshrc; autoload -U compinit && compinit; rehash
 ```
@@ -82,7 +83,7 @@ It can be tedious to repeatedly make a change to the list and re-print it to see
 
 ### View Functions
 | Command | Description |
-| :---: | --- |
+| :---: | :--- |
 |`bc`|Group tasks together by shared contexts. Tasks with multiple contexts will appea with every context group they belong to.|
 |`bp`|Group tasks together by shared projects. Tasks with multiple projects will appea with every project group they belong to.|
 |`vc`|Only show those tasks that possess all the contexts given after 'vc'.|
@@ -122,42 +123,49 @@ It can be tedious to repeatedly make a change to the list and re-print it to see
 |`usub`|undo making a task a subtask.|
 |`con`|contract a task, so that its subtasks are hidden in [nest view](#nest).|
 |`exp`|expand a contracted task so its subtasks are visible in nestview [nest view](#nest).|
-|`rep`|Set a task to repeat. On completion, it will be recreated and scheduled for a date in the future specified by the format of its repeat tag. The format is as follows:
-- _Repeat on certain weekdays_: combine any number the following letter, representing the days from Monday to Sunday: m,t,w,r,f,s,u. On completion, the task will be rescheduled on the next weekday that has its representative letter in the tag.
-- _Repeat a fixed number of days after completion_: represented by combining the letter a and a number representing the day. For example, 'a3' will cause a task to be rescheduled 3 days after it was actually completed, regardless of when it was originally scheduled to be completed.
-- _Repeat a fixed number of days after original scheduling_: represented by the letter e and the number of days after which to repeat. For example, a task with the repeat tag 'e10' will be rescheduled 10 days after its original due date, even if completed late. If the task is completed so late that its new due date would still be in the past, the same number is added again under the due date is in the future.|
+|`rep`|Set a task to repeat. On completion, it will be recreated and scheduled for a date in the future specified by the format of its repeat tag. The format is as shown [here](#Repeat format)|
 |`urep`|Remove a repition tag from a task.|
-|`setabove`|Move a task above another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled. |
-|`setbelow`|Move a task below another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled. |
+|`setabove`|Move a task above another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled.|
+|`setbelow`|Move a task below another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled.|
 
 #### Date Codes
 dates can be provded in the following formats:
-* __m__ Monday
-* __t__ Tuesday
-* __w__ Wednesday
-* __r__ Thursday
-* __f__ Friday
-* __s__ Saturday
-* __u__ Sunday
-* __n__ today ('n' for now)
-* __DD__ The next occurence of that day of the month, be it the current or following month.
-* __MM-DD__ Specify both the day and the month.
-* __YYYY-MM-DD__ Specify full date.
+
+| Code | Meaning |
+| :---: | :--- |
+|`m`|Monday|
+|`t`|Tuesday|
+|`w`|Wednesday|
+|`r`|Thursday|
+|`f`|Friday|
+|`s`|Saturday|
+|`u`|Sunday|
+|`n`|today ('n' for now)|
+|`DD`|The next occurence of that day of the month, be it the current or following month.|
+|`MM-DD`|Specify both the day and the month.|
+|`YYYY-MM-DD`|Specify full date.|
+
+#### Repeat Format
+- __Repeat on certain weekdays:__ combine any number the following letter, representing the days from Monday to Sunday: m,t,w,r,f,s,u. On completion, the task will be rescheduled on the next weekday that has its representative letter in the tag.
+- __Repeat a fixed number of days after completion:__ represented by combining the letter a and a number representing the day. For example, 'a3' will cause a task to be rescheduled 3 days after it was actually completed, regardless of when it was originally scheduled to be completed.
+- __Repeat a fixed number of days after original scheduling:__ represented by the letter e and the number of days after which to repeat. For example, a task with the repeat tag 'e10' will be rescheduled 10 days after its original due date, even if completed late. If the task is completed so late that its new due date would still be in the past, the same number is added again under the due date is in the future.
 
 #### Task Line Component Codes
-- __n__ the task number
-- __x__ the 'x' of finished tasks
-- __pr__  the task priority
-- __dn__ the date a task was done
-- __d__ the date a task is (was) due
-- __t__ the task text
-- __p__ the task's projects
-- __c__ the task's contexts
-- __r__ the task's repitition tag
-- __a__ the tag showing when the task was added
-- __o__ the ordering tag (hidden by default)
-- __p_id__ the tag assigned to a task which is a parent in nested mode (hidden by default)
-- __c_id__ the tag assigned to a task which is a child in nested mode (hidden by default)
+| Code | Component |
+| :---: | :--- |
+|`n`|The task number|
+|`x`|The 'x' of finished tasks|
+|`pr`|The task priority|
+|`dn`|The date a task was done|
+|`d`|The date a task is (was) due|
+|`t`|The task text|
+|`p`|The task's projects|
+|`c`|The task's contexts|
+|`r`|The task's repitition tag|
+|`a`|The tag showing when the task was added|
+|`o`|The ordering tag (hidden by default)|
+|`p_id`|The tag assigned to a task which is a parent in nested mode (hidden by default)|
+|`c_id`|The tag assigned to a task which is a child in nested mode (hidden by default)|
 
 ## Settings
 
@@ -182,7 +190,7 @@ archive_automatically=false
 archive_location=archive.txt
 ```
 
-## To-Do (The Irony)
+## To-Do (oh, the irony)
 - Package properly and include install script
 - Bash Autocompletion
 

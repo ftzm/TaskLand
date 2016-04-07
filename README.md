@@ -95,25 +95,14 @@ It can be tedious to repeatedly make a change to the list and re-print it to see
 |`week`|Show tasks due this week.|
 |`until`|View tasks that are due up to and including the specified date. Use the date code specified [here](#Date Code)|
 |`reverse`|Print the tasks in reverse order. Useful if your task list is so long it doesn't fit into the terminal screen.|
-|`hide`|Hide components of the task line. Components are denoted with the following codes:
-- n = the task number
-- x = the 'x' of finished tasks
-- pr =  the task priority
-- dn = the date a task was done
-- d = the date a task is (was) due
-- t = the task text
-- p = the task's projects
-- c = the task's contexts
-- r = the task's repitition tag
-- a = the tag showing when the task was added
-- o = the ordering tag (hidden by default)
-- p_id = the tag assigned to a task which is a parent in nested mode (hidden by default)
-- c_id = the tag assigned to a task which is a child in nested mode (hidden by default)|
+|`hide`|Hide components of the task line. Components are denoted with the codes listed [here](#Task Line Component Codes)|
 |`nocolor`|As the name suggests, prints tasks without colorization.|
 |`nest`|prints the tasks in nested mode. If a task is set as a sub-task of another task, it will be positioned underneath that task with a small indentation. Usefuly for keeping track of large projects.|
 |`h`|Print headers above each group of tasks due on the same date. Quickly see when tasks are due.|
 
 ### Action Commands
+| Command | Description |
+| :---: | --- |
 |`add`|Add a task with the accompanying text. As an exception to the rule regarding multi-word arguments, task text does *not* need to be enclosed in quotation marks.|
 |`edit`|Edit a task's text. The original text will be provided for your editing pleasure.|
 |`rm`|Remove a task without completing it.|
@@ -141,20 +130,34 @@ It can be tedious to repeatedly make a change to the list and re-print it to see
 |`setabove`|Move a task above another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled. |
 |`setbelow`|Move a task below another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled. |
 
-#### Date Code
+#### Date Codes
 dates can be provded in the following formats:
+* __m__ Monday
+* __t__ Tuesday
+* __w__ Wednesday
+* __r__ Thursday
+* __f__ Friday
+* __s__ Saturday
+* __u__ Sunday
+* __n__ today ('n' for now)
+* __DD__ The next occurence of that day of the month, be it the current or following month.
+* __MM-DD__ Specify both the day and the month.
+* __YYYY-MM-DD__ Specify full date.
 
-* __m__ - Monday
-* __t__ - Tuesday
-* __w__ - Wednesday
-* __r__ - Thursday
-* __f__ - Friday
-* __s__ - Saturday
-* __u__ - Sunday
-* __n__ - today ('n' for now)
-* __DD__ - The next occurence of that day of the month, be it the current or following month.
-* __MM-DD__ - Specify both the day and the month.
-* __YYYY-MM-DD__ - Specify full date.
+#### Task Line Component Codes
+- __n__ the task number
+- __x__ the 'x' of finished tasks
+- __pr__  the task priority
+- __dn__ the date a task was done
+- __d__ the date a task is (was) due
+- __t__ the task text
+- __p__ the task's projects
+- __c__ the task's contexts
+- __r__ the task's repitition tag
+- __a__ the tag showing when the task was added
+- __o__ the ordering tag (hidden by default)
+- __p_id__ the tag assigned to a task which is a parent in nested mode (hidden by default)
+- __c_id__ the tag assigned to a task which is a child in nested mode (hidden by default)
 
 ## Settings
 
@@ -167,7 +170,6 @@ Below is the default configuration file with explanations of each field:
 ```bash
 # Location of the todo-list file:
 list_location=todo.txt
-
 # What command to run when no commands are specified:
 default_command=h
 # Which fields to hide by default:

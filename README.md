@@ -78,19 +78,15 @@ Additionally, commands can be run on a task as it is being added. First enter th
 
 #### Shell Mode
 
-It can be tedious to repeatedly make a change to the list and re-print it to see the effect. For that reason, TaskLand
+It can be tedious to repeatedly make a change to the list and re-print it to see the effect. For that reason, TaskLand has a "shell mode". This is invoked by proving the argument `shell` followed by any valid combination of view commands. This will print the task list with the provided view commands and prompt for an action command. After entering an action command the list will be re-printed and the prompt reproduced. Exit by pressing `enter` without any input.
 
 ### View Functions
-
-#### bc - view by context
-Group tasks together by shared contexts. Tasks with multiple contexts will appea with every context group they belong to.
-
-#### bp - view by project
-Group tasks together by shared projects. Tasks with multiple projects will appea with every project group they belong to.
-
-#### vc - filter by contexts
+| Command | Description |
+| :---: | --- |
+|`bc`| Group tasks together by shared contexts. Tasks with multiple contexts will appea with every context group they belong to. |
+|`bp`| Group tasks together by shared projects. Tasks with multiple projects will appea with every project group they belong to. |
+|vc 
 Only show those tasks that possess all the contexts given after 'vc'.
-
 #### vp - filter by projects
 Only show those tasks that possess all the projects given after 'vp'.
 

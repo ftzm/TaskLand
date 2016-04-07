@@ -96,7 +96,7 @@ It can be tedious to repeatedly make a change to the list and re-print it to see
 |`reverse`|Print the tasks in reverse order. Useful if your task list is so long it doesn't fit into the terminal screen.|
 |`hide`|Hide components of the task line. Components are denoted with the codes listed [here](#Task Line Component Codes)|
 |`nocolor`|As the name suggests, prints tasks without colorization.|
-|`nest`<h6 id="Nest View"> <h6>|prints the tasks in nested mode. If a task is set as a sub-task of another task, it will be positioned underneath that task with a small indentation. Usefuly for keeping track of large projects.|
+|`nest`<h6 id="nest"> <h6>|prints the tasks in nested mode. If a task is set as a sub-task of another task, it will be positioned underneath that task with a small indentation. Usefuly for keeping track of large projects.|
 |`h`|Print headers above each group of tasks due on the same date. Quickly see when tasks are due.|
 
 ### List of Action Commands
@@ -121,7 +121,7 @@ It can be tedious to repeatedly make a change to the list and re-print it to see
 |`usub`|undo making a task a subtask.|
 |`con`|contract a task, so that its subtasks are hidden in [nest view](#nest).|
 |`exp`|expand a contracted task so its subtasks are visible in nestview [nest view](#nest).|
-|`rep`|Set a task to repeat. On completion, it will be recreated and scheduled for a date in the future specified by the format of its repeat tag. The format is as shown [here](#Repeat format)|
+|`rep`|Set a task to repeat. On completion, it will be recreated and scheduled for a date in the future specified by the format of its repeat tag. The format is as shown [here](#Repeat Format)|
 |`urep`|Remove a repition tag from a task.|
 |`setabove`|Move a task above another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled.|
 |`setbelow`|Move a task below another task in the list. The other task is designated by its task number, and both tasks must either share a due date or not be scheduled.|

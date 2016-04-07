@@ -50,7 +50,7 @@ TaskLand also includes an autocompletion script for Zsh. This will suggest comma
 - Copy taskland_completion_zsh.sh to /home/youruser/.zsh/completions
 - Rename the file to _taskland
 - edit _taskland such that the path in the second line points to your taskland.py
-- add the following lines to your .zshrc:
+- add the following lines to the bottom of your .zshrc:
 ```bash
 fpath = (~/.zsh/completions $fpath) # only add this is not already present
 compdef _taskland /path/to/your/taskland.py:taskland

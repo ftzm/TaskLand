@@ -5,7 +5,7 @@ Taskland is a Python-based, command-line application to manage tasks. It aims to
 <p align="center">
   <img src="https://github.com/ftzm/TaskLand/blob/master/taskland.gif?raw=true">
 </p>
-<br>
+
 ## Features
 
 Taskland sports the following features, among others:

@@ -81,8 +81,7 @@ def view_reversed(tasks):
 
 def normal_print(tasks, color, exclusions):
     """print tasks using basic print method"""
-    for t in tasks:
-        print(t.compose_line(color, exclusions))
+    print('\n'.join([t.compose_line(color, exclusions) for t in tasks]))
 
 
 def nest_sort(tasks):
@@ -160,6 +159,7 @@ def get_console_size():
 def date_headers(tasks, color, trimmings):
     """print lines with date headers"""
     previous_title = ''
+    output_lines = []
     for t in tasks:
         if t.x is not None:
             title = 'Finished'
@@ -173,5 +173,7 @@ def date_headers(tasks, color, trimmings):
         if title != previous_title:
             previous_title = title
             buff = get_console_size()[1] - len(title)
-            print('\x1b[48;5;0m{}{}\x1b[0m'.format(title, ' '*buff))
-        print(t.compose_line(color, trimmings))
+            output_lines.append('\x1b[48;5;0m{}{}\x1b[0m'
+                                .format(title, ' '*buff))
+        output_lines.append(t.compose_line(color, trimmings))
+    print('\n'.join(output_lines))

@@ -11,6 +11,7 @@ Description: cli todolist program
 
 import sys
 import os
+import time
 import collections
 import datetime
 import config
@@ -25,7 +26,7 @@ __location__ = os.path.realpath(
 defaults = {
     'list_location': 'todo.txt',
     'default_command': 'h',
-    'default_view': 'hide o p_id c_id',
+    'default_view': 'hide o p_id c_id a',
     'archive_location': 'archive.txt',
     'archive_automatically': 'false',
     'archive_delay': '2'
@@ -83,7 +84,8 @@ def collect_tasks():
 
 
 def add_warning(*_):
-    sys.exit("Error: 'add' must be the first command")
+    print("Error: 'add' must be the first command")
+    raise KeyError
 
 
 def write_tasks(tasks):
@@ -114,13 +116,18 @@ def archive_all(tasks):
 
 def shellmode(args):
     while True:
-        handle_view_commands(args)
-        commands = input("Input Command: ")
-        if commands == '':
-            print("Shell mode exited")
-            break
-        else:
-            handle_action_commands(commands.split(' '))
+        try:
+            os.system('clear')
+            handle_view_commands(args[:])
+            commands = input("Input Command: ")
+            if commands == '':
+                print("Shell mode exited")
+                break
+            else:
+                handle_action_commands(commands.split(' '))
+        except:
+            time.sleep(1)
+            continue
 
 view_commands = collections.OrderedDict([
     ('bc', (views.view_by_context, False)),
@@ -183,12 +190,14 @@ def make_command_list(args, commands):
                 try:
                     command_arg = [args.pop(0)]
                 except IndexError:
-                    sys.exit("Error: '{}' is missing an argument".format(arg))
+                    print("Error: '{}' is missing an argument".format(arg))
+                    raise
             else:
                 command_arg = []
             command_list.append((arg, command_arg))
         except KeyError:
-            sys.exit("Error: {} is not a command.".format(arg))
+            print("Error: {} is not a command.".format(arg))
+            raise
     command_list.sort(key=lambda x: list(commands.keys()).index(x[0]))
     return command_list
 
@@ -246,7 +255,8 @@ def extract_addition(args):
         else:
             break
     if not text:
-        sys.exit("Error: new task must contain text")
+        print("Error: new task must contain text")
+        raise
     else:
         return args, ' '.join(text)
 
@@ -283,7 +293,7 @@ def handle_action_commands(args):
     if args[0] == 'add':
         args.pop(0)
         args, addition = extract_addition(args)
-        target = len(tasks) - 1
+        target = len(tasks)
     # or pop first element off as target if is digit
     elif args[0].isdigit():
         target = int(args.pop(0)) - 1
@@ -299,7 +309,7 @@ def handle_action_commands(args):
         for _, args in command_list:
             args.insert(0, target)
     else:
-        sys.exit('Error: you must specify a target')
+        print('Error: you must specify a target')
 
     # if addition, add task so other commands can act upon it
     if addition:
@@ -308,7 +318,8 @@ def handle_action_commands(args):
     try:
         tasks = execute_command_list(tasks, command_list, action_commands)
     except IndexError:
-        sys.exit("Error: task number is invalid")
+        print("Error: task number is invalid")
+        raise
 
     write_tasks(tasks)
 
@@ -324,9 +335,15 @@ def main(args):
     if len(args) == 0:
         args = settings['default_command'].split(' ')
     if args[0] in view_commands.keys():
-        handle_view_commands(args)
+        try:
+            handle_view_commands(args)
+        except:
+            sys.exit()
     elif args[0] in action_commands.keys() or args[0].isdigit():
-        handle_action_commands(args)
+        try:
+            handle_action_commands(args)
+        except:
+            sys.exit()
     elif args[0] in general_commands.keys():
         handle_general_commands(args[0])
     elif args[0] == 'pp':

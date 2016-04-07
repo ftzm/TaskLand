@@ -107,7 +107,8 @@ def unset_context(tasks, num, i):
     try:
         tasks[num].contexts.pop(i-1)
     except IndexError:
-        sys.exit("Error: invalid context number")
+        print("Error: invalid context number")
+        raise
     return tasks
 
 
@@ -124,7 +125,8 @@ def unset_project(tasks, num, i=1):
     try:
         tasks[num].projects.pop(int(i)-1)
     except IndexError:
-        sys.exit("Error: invalid project number")
+        print("Error: invalid project number")
+        raise
     return tasks
 
 
@@ -198,7 +200,7 @@ def contract(tasks, num):
 
 def expand(tasks, num):
     """expand a contracted task so that its children show in nest view"""
-    tasks[num].contracted = True
+    tasks[num].contracted = False
     return tasks
 
 

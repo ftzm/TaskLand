@@ -25,8 +25,8 @@ action_cmds=(
     'edit:Edit a task description'
     'do:Mark a task as completed'
     "rm:Remove a task (not marked done, repeat task not created)"
-    's:Schedule task (DD, MM-DD, YYYY-MM-DD, m/t/w/r/f/s/u)'
-    'us:Unschedule a task'
+    'sc:Schedule task (DD, MM-DD, YYYY-MM-DD, m/t/w/r/f/s/u)'
+    'usc:Unschedule a task'
     'pr:Prioritize a task'
     'upr:Unprioritize a task'
     'c:Assign a task context(s)'

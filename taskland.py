@@ -292,7 +292,6 @@ def handle_action_commands(args):
     else:
         args, target = extract_target(args)
 
-    print(target)
     command_list = make_command_list(args, action_commands)
 
     # add the target into the arg list of every command

@@ -61,13 +61,11 @@ compdef _taskland /path/to/your/taskland.py:taskland
 ```
 ## Usage
 
-### Giving Commands
-
-There are two types of commands: View commands, which print the task list in various formats, and action commands, which change the content of the task list.
+There are two types of commands: View commands, which print the task list in various ways, and action commands, which make changes to the task list.
 
 #### View Commands
 
-View commands
+View commands are relatively straightforward. The majority essentially filter the task list, for example by limiting the tasks shown to those scheduled before a certain date or containing certain words. View commands can be combined, so you can do things like viewing only those tasks scheduled this week belonging to a particular project. There are also some view commands that change the way the tasks are printed. More info on those is provided later.
 
 #### Action Commands
 
@@ -81,7 +79,7 @@ Additionally, commands can be run on a task as it is being added. First enter th
 
 It can be tedious to repeatedly make a change to the list and re-print it to see the effect. For that reason, TaskLand has a "shell mode". This is invoked by proving the argument `shell` followed by any valid combination of view commands. This will print the task list with the provided view commands and prompt for an action command. After entering an action command the list will be re-printed and the prompt reproduced. Exit by pressing `enter` without any input.
 
-### View Functions
+### List of View Functions
 | Command | Description |
 | :---: | :--- |
 |`bc`|Group tasks together by shared contexts. Tasks with multiple contexts will appea with every context group they belong to.|
@@ -101,7 +99,7 @@ It can be tedious to repeatedly make a change to the list and re-print it to see
 |`nest`|prints the tasks in nested mode. If a task is set as a sub-task of another task, it will be positioned underneath that task with a small indentation. Usefuly for keeping track of large projects.|
 |`h`|Print headers above each group of tasks due on the same date. Quickly see when tasks are due.|
 
-### Action Commands
+### List of Action Commands
 | Command | Description |
 | :---: | --- |
 |`add`|Add a task with the accompanying text. As an exception to the rule regarding multi-word arguments, task text does *not* need to be enclosed in quotation marks.|

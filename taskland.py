@@ -292,10 +292,11 @@ def handle_action_commands(args):
     else:
         args, target = extract_target(args)
 
+    print(target)
     command_list = make_command_list(args, action_commands)
 
     # add the target into the arg list of every command
-    if target:
+    if target is not None:
         for _, args in command_list:
             args.insert(0, target)
     else:

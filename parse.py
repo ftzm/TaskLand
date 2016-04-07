@@ -142,6 +142,8 @@ class Task(object):
     def compose_line(self, color=True, exclusions=None, reorder=None):
         """convert task object into a string for display or writing"""
 
+        if exclusions is None:
+            exclusions = []
         self.num = reorder or self.num
 
         parts = [

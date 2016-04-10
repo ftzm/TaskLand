@@ -66,7 +66,7 @@ def collect_tasks():
 
     # archive tasks that are too old
     if settings['archive_automatically'] == 'true':
-        delay = datetime.timedelta(int(settings['archive_delay']))
+        delay = int(settings['archive_delay'])
         tasks = archive_done(tasks, delay)
         write_tasks(tasks)
 
@@ -99,11 +99,12 @@ def write_tasks(tasks):
 
 def archive_done(tasks, delay):
     """remove tasks marked done from the task list and write to archive file"""
+    archive_location = os.path.dirname(__file__) + "/" + settings['archive_location']
     to_go = [t for t in tasks if t.done and datetime.date.today() >=
              t.done + datetime.timedelta(delay)]
     to_stay = [t for t in tasks if t not in to_go]
     to_go_lines = [t.compose_line(False, ['n']) for t in to_go]
-    with open(settings['archive_location'], "a") as f:
+    with open(archive_location, "a") as f:
         for line in to_go_lines:
             f.write(line + '\n')
     return to_stay
